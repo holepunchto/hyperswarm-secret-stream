@@ -1,0 +1,29 @@
+{
+  "name": "noise-secret-stream",
+  "version": "0.0.0",
+  "description": "Secret stream backed by Noise and libsodium's secretstream",
+  "main": "index.js",
+  "dependencies": {
+    "noise-protocol": "^3.0.1",
+    "sodium-secretstream": "^1.0.0",
+    "sodium-universal": "^3.0.4",
+    "streamx": "^2.10.2"
+  },
+  "devDependencies": {
+    "standard": "^16.0.3",
+    "tape": "^5.1.1"
+  },
+  "scripts": {
+    "test": "standard && tape test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mafintosh/noise-secret-stream.git"
+  },
+  "author": "Mathias Buus (@mafintosh)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mafintosh/noise-secret-stream/issues"
+  },
+  "homepage": "https://github.com/mafintosh/noise-secret-stream"
+}
