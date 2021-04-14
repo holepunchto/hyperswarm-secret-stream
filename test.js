@@ -1,6 +1,7 @@
 const tape = require('tape')
 const net = require('net')
 const crypto = require('crypto')
+const { Readable } = require('streamx')
 const NoiseStream = require('./')
 
 tape('basic', function (t) {
@@ -73,6 +74,37 @@ tape('works with tiny chunks', function (t) {
       t.end()
     })
   })
+})
 
-  // a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+tape('send and recv lots of data', function (t) {
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  const buf = Buffer.alloc(65536)
+  let size = 1024 * 1024 * 1024 // 1gb
+
+  const r = new Readable({
+    read (cb) {
+      this.push(buf)
+      size -= buf.byteLength
+      if (size <= 0) this.push(null)
+      cb(null)
+    }
+  })
+
+  r.pipe(a)
+
+  const then = Date.now()
+  let recv = 0
+
+  b.on('data', function (data) {
+    recv += data.byteLength
+  })
+  b.on('end', function () {
+    t.same(recv, 1024 * 1024 * 1024)
+    t.pass('1gb transfer took ' + (Date.now() - then) + 'ms')
+    t.end()
+  })
 })

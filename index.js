@@ -1,6 +1,6 @@
 const { Duplex } = require('streamx')
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
-const Passthrough = require('./lib/passthrough')
+const PassThrough = require('./lib/passthrough')
 const Handshake = require('./lib/handshake')
 
 module.exports = class NoiseSecretStream extends Duplex {
@@ -8,14 +8,14 @@ module.exports = class NoiseSecretStream extends Duplex {
     super()
 
     this.isInitiator = isInitiator
-    this.rawStream = rawStream || new Passthrough()
+    this.rawStream = rawStream || new PassThrough()
 
     this.publicKey = null
     this.remotePublicKey = null
     this.handshakeHash = null
 
-    this._out = rawStream || this.rawStream.out
-    this._inc = rawStream || this.rawStream.inc
+    // unwrapped raw stream
+    this._rawStream = rawStream || this.rawStream.reverse
 
     // handshake state
     this._handshake = opts.tx ? null : new Handshake(this.isInitiator, opts.keyPair || Handshake.keyPair(), 'XX')
@@ -151,7 +151,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this._handshakeDone === null) return
 
     if (h !== null) {
-      if (h.data) this._out.write(h.data)
+      if (h.data) this._rawStream.write(h.data)
       if (!h.tx) return
     }
 
@@ -178,7 +178,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.remotePublicKey = remotePublicKey
     this.handshakeHash = handshakeHash
 
-    this._out.write(buf)
+    this._rawStream.write(buf)
   }
 
   _open (cb) {
@@ -187,9 +187,9 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._handshakeDone = cb
     if (this.isInitiator) this._onhandshakert(this._handshake.send())
 
-    this._inc.on('data', this._onrawdata.bind(this))
-    this._inc.on('end', this._onrawend.bind(this))
-    this._out.on('drain', this._onrawdrain.bind(this))
+    this._rawStream.on('data', this._onrawdata.bind(this))
+    this._rawStream.on('end', this._onrawend.bind(this))
+    this._rawStream.on('drain', this._onrawdrain.bind(this))
 
     this.rawStream.on('error', this.destroy.bind(this))
     this.rawStream.on('close', this.destroy.bind(this, null))
@@ -224,7 +224,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     writeUint24le(wrapped.byteLength - 3, wrapped)
     this._encrypt.next(wrapped.subarray(4, 4 + data.byteLength), wrapped.subarray(3))
 
-    if (this._out.write(wrapped) === false) {
+    if (this._rawStream.write(wrapped) === false) {
       this._drainDone = cb
     } else {
       cb(null)
@@ -232,7 +232,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _final (cb) {
-    this._out.end()
+    this._rawStream.end()
     cb(null)
   }
 
