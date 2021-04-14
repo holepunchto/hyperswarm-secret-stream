@@ -1,5 +1,6 @@
 const tape = require('tape')
 const net = require('net')
+const crypto = require('crypto')
 const NoiseStream = require('./')
 
 tape('basic', function (t) {
@@ -44,3 +45,34 @@ tape('works with external streams', function (t) {
   })
 })
 
+tape('works with tiny chunks', function (t) {
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  const tmp = crypto.randomBytes(40000)
+
+  a.write(Buffer.from('hello world'))
+  a.write(tmp)
+
+  a.rawStream.on('data', function (data) {
+    for (let i = 0; i < data.byteLength; i++) {
+      b.rawStream.write(data.subarray(i, i + 1))
+    }
+  })
+
+  b.rawStream.on('data', function (data) {
+    for (let i = 0; i < data.byteLength; i++) {
+      a.rawStream.write(data.subarray(i, i + 1))
+    }
+  })
+
+  b.once('data', function (data) {
+    t.same(data, Buffer.from('hello world'))
+    b.once('data', function (data) {
+      t.same(data, tmp)
+      t.end()
+    })
+  })
+
+  // a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+})
