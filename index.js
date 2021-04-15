@@ -238,11 +238,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _open (cb) {
-    if (this._encrypt !== null) return cb(null)
     if (this._openPromise) return this._openP(cb)
-
-    this._handshakeDone = cb
-    if (this.isInitiator) this._onhandshakert(this._handshake.send())
 
     this._rawStream.on('data', this._onrawdata.bind(this))
     this._rawStream.on('end', this._onrawend.bind(this))
@@ -250,6 +246,11 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     this.rawStream.on('error', this.destroy.bind(this))
     this.rawStream.on('close', this.destroy.bind(this, null))
+
+    if (this._encrypt !== null) return cb(null)
+
+    this._handshakeDone = cb
+    if (this.isInitiator) this._onhandshakert(this._handshake.send())
   }
 
   _predestroy () {
