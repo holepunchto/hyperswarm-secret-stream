@@ -188,7 +188,7 @@ tape('send garbage secretstream header data', function (t) {
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
-  a.on('error', function (err) {
+  a.on('error', function () {
     t.pass('header errored')
     t.end()
   })
@@ -213,7 +213,7 @@ tape('send garbage secretstream payload data', function (t) {
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
-  a.on('error', function (err) {
+  a.on('error', function () {
     t.pass('payload errored')
     t.end()
   })
