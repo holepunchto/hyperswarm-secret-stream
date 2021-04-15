@@ -166,6 +166,11 @@ module.exports = class NoiseSecretStream extends Duplex {
       return
     }
 
+    if (message.length < ABYTES) {
+      this.destroy(new Error('Invalid message received'))
+      return
+    }
+
     const plain = message.subarray(1, message.byteLength - ABYTES + 1)
     this._decrypt.next(message, plain)
 
