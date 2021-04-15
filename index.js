@@ -68,7 +68,6 @@ module.exports = class NoiseSecretStream extends Duplex {
       this._rawStream = this.rawStream.reverse
     }
 
-
     if (opts.handshake) {
       const { tx, rx, handshakeHash, publicKey, remotePublicKey } = opts.handshake
       this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
