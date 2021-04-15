@@ -16,6 +16,9 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.remotePublicKey = null
     this.handshakeHash = null
 
+    // pointer for upstream to set data here if they want
+    this.userData = null
+
     // unwrapped raw stream
     this._rawStream = null
     this._openPromise = promise || null
@@ -160,6 +163,10 @@ module.exports = class NoiseSecretStream extends Duplex {
       if (this._handshake) {
         this._onhandshakert(this._handshake.recv(message))
       } else if (this._decrypt !== null) {
+        if (message.byteLength !== HEADERBYTES) {
+          this.destroy(new Error('Invalid header message received'))
+          return
+        }
         this._decrypt.init(message)
         this._setup = false // setup is now done
       }
@@ -172,7 +179,13 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
 
     const plain = message.subarray(1, message.byteLength - ABYTES + 1)
-    this._decrypt.next(message, plain)
+
+    try {
+      this._decrypt.next(message, plain)
+    } catch (err) {
+      this.destroy(err)
+      return
+    }
 
     if (this.push(plain) === false) {
       this.rawStream.pause()

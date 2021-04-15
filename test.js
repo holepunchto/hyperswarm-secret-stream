@@ -21,6 +21,29 @@ tape('basic', function (t) {
   })
 })
 
+tape('data looks encrypted', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.write(Buffer.from('plaintext'))
+
+  const buf = []
+
+  a.rawStream.on('data', function (data) {
+    buf.push(Buffer.from(data))
+  })
+
+  b.on('data', function (data) {
+    t.same(data, Buffer.from('plaintext'))
+    t.ok(Buffer.concat(buf).indexOf(Buffer.from('plaintext')) === -1)
+    t.end()
+  })
+})
+
 tape('works with external streams', function (t) {
   const server = net.createServer(function (socket) {
     const s = new NoiseStream(false, socket)
@@ -137,5 +160,67 @@ tape('send and recv lots of data', function (t) {
     t.ok(same, 'data was the same')
     t.pass('1gb transfer took ' + (Date.now() - then) + 'ms')
     t.end()
+  })
+})
+
+tape('send garbage handshake data', function (t) {
+  t.plan(2)
+
+  check(Buffer.alloc(65536))
+  check(Buffer.from('\x10\x00\x00garbagegarbagegarbage'))
+
+  function check (buf) {
+    const a = new NoiseStream(true)
+
+    a.on('error', function () {
+      t.pass('handshake errored')
+    })
+
+    a.rawStream.write(buf)
+  }
+})
+
+tape('send garbage secretstream header data', function (t) {
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  b.on('error', () => {})
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.on('error', function (err) {
+    t.pass('header errored')
+    t.end()
+  })
+
+  a.on('open', function () {
+    t.pass('opened')
+    a.rawStream.write(Buffer.from([0xff, 0, 0]))
+    a.rawStream.write(crypto.randomBytes(0xff))
+  })
+})
+
+tape('send garbage secretstream payload data', function (t) {
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  b.on('error', () => {})
+  b.write(Buffer.from('hi'))
+
+  b.on('data', function (data) {
+    t.fail('b should not recv messages')
+  })
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.on('error', function (err) {
+    t.pass('payload errored')
+    t.end()
+  })
+
+  a.once('data', function () {
+    t.pass('a got initial message')
+    a.rawStream.write(Buffer.from([0xff, 0, 0]))
+    a.rawStream.write(crypto.randomBytes(0xff))
   })
 })
