@@ -1,6 +1,6 @@
 {
   "name": "noise-secret-stream",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Secret stream backed by Noise and libsodium's secretstream",
   "main": "index.js",
   "dependencies": {
