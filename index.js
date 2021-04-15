@@ -1,59 +1,86 @@
 const { Duplex } = require('streamx')
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
-const sodium = require('sodium-universal')
-const noise = require('noise-protocol')
-const { generateKeypair, generateSeedKeypair } = require('noise-protocol/dh')
-
-const PROLOUGE = Buffer.from('hypercore')
-const EMPTY = Buffer.alloc(0)
+const Bridge = require('./lib/bridge')
+const Handshake = require('./lib/handshake')
 
 module.exports = class NoiseSecretStream extends Duplex {
-  constructor (isInitiator, opts = {}) {
+  constructor (isInitiator, rawStream, opts = {}) {
     super()
 
-    const keyPair = opts.keyPair || noise.keygen()
+    const promise = opts.async
 
     this.isInitiator = isInitiator
-    this.publicKey = keyPair.publicKey
+    this.rawStream = null
+
+    this.publicKey = null
     this.remotePublicKey = null
+    this.handshakeHash = null
 
-    this._keyPair = keyPair
-    this._setup = true
-    this._noiseHandshake = null
-    this._noiseHandshakeBuffer = Buffer.alloc(100)
+    // pointer for upstream to set data here if they want
+    this.userData = null
 
-    this._tx = null
-    this._rx = null
+    // unwrapped raw stream
+    this._rawStream = null
+    this._openPromise = promise || null
+
+    // handshake state
+    this._handshake = null
+    this._handshakeDone = null
+
+    // message parsing state
     this._state = 0
     this._len = 0
     this._tmp = 1
     this._message = null
-    this._outgoingPending = []
-    this._outgoing = null
+
+    this._drainDone = null
     this._outgoingPlain = null
+    this._outgoingWrapped = null
     this._utp = null
+    this._setup = true
+    this._encrypt = null
+    this._decrypt = null
 
-    this.once('finish', this.push.bind(this, null))
-    this.on('pipe', this._onpipe)
+    if (!promise) this._config(isInitiator, rawStream, opts)
+
+    // wiggle it to trigger open immediately (TODO add streamx option for this)
+    this.resume()
+    this.pause()
   }
 
-  static keyPair (seed, publicKey = Buffer.alloc(noise.PKLEN), secretKey = Buffer.alloc(noise.SKLEN)) {
-    if (seed) generateSeedKeypair(seed, publicKey, secretKey)
-    else generateKeypair(publicKey, secretKey)
-    return { publicKey, secretKey }
+  static async (promise) {
+    if (typeof promise === 'function') promise = promise() // support async functions
+    return new NoiseSecretStream(false, null, { async: promise })
   }
 
-  _open (cb) {
-    this._noiseHandshake = noise.initialize('XX', this.isInitiator, PROLOUGE, this._keyPair, null, null)
-    if (this.isInitiator) this._handshakeRT()
-    cb(null)
+  static keyPair (seed) {
+    return Handshake.keyPair(seed)
   }
 
-  _onpipe (dest) {
-    if (typeof dest.setContentSize === 'function') this._utp = dest
+  _config (isInitiator, rawStream, opts = {}) {
+    this.isInitiator = isInitiator
+
+    if (rawStream) {
+      this.rawStream = rawStream
+      this._rawStream = rawStream
+      if (typeof this.rawStream.setContentSize === 'function') {
+        this._utp = rawStream
+      }
+    } else {
+      this.rawStream = rawStream || new Bridge()
+      this._rawStream = this.rawStream.reverse
+    }
+
+    if (opts.handshake) {
+      const { tx, rx, handshakeHash, publicKey, remotePublicKey } = opts.handshake
+      this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
+    } else {
+      this._handshake = new Handshake(this.isInitiator, opts.keyPair || Handshake.keyPair(), 'XX')
+      this.publicKey = this._handshake.keyPair.publicKey
+    }
   }
 
-  _write (data, cb) {
+  _onrawdata (data) {
     let offset = 0
 
     do {
@@ -68,7 +95,8 @@ module.exports = class NoiseSecretStream extends Duplex {
           if (this._tmp === 16777216) {
             this._tmp = 0
             this._state = 1
-            if (this._utp !== null) this._utp.setContentSize(this._len)
+            const unprocessed = data.length - offset
+            if (unprocessed < this._len && this._utp !== null) this._utp.setContentSize(this._len - unprocessed)
           }
 
           break
@@ -85,24 +113,41 @@ module.exports = class NoiseSecretStream extends Duplex {
             break
           }
 
+          const unprocessed = data.length - offset
+
           if (this._message === null) {
             this._message = Buffer.allocUnsafe(this._len)
           }
 
           data.copy(this._message, this._tmp, offset)
+          this._tmp += unprocessed
 
           if (end <= data.length) {
             offset += missing
             this._incoming()
           } else {
-            offset += data.length - offset
+            offset += unprocessed
           }
 
           break
         }
       }
     } while (offset < data.length && !this.destroying)
+  }
 
+  _onrawend () {
+    this.push(null)
+  }
+
+  _onrawdrain () {
+    const drain = this._drainDone
+    if (drain === null) return
+    this._drainDone = null
+    drain()
+  }
+
+  _read (cb) {
+    this.rawStream.resume()
     cb(null)
   }
 
@@ -114,17 +159,17 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._tmp = 1
     this._message = null
 
-    if (this._setup) {
-      if (this._noiseHandshake !== null) {
-        const split = noise.readMessage(this._noiseHandshake, message, EMPTY)
-        if (split) this._onhandshake(split, [])
-        else this._handshakeRT()
-        return
+    if (this._setup === true) {
+      if (this._handshake) {
+        this._onhandshakert(this._handshake.recv(message))
+      } else if (this._decrypt !== null) {
+        if (message.byteLength !== HEADERBYTES) {
+          this.destroy(new Error('Invalid header message received'))
+          return
+        }
+        this._decrypt.init(message)
+        this._setup = false // setup is now done
       }
-
-      // last message, receiving header
-      this._rx.init(message)
-      this._setup = false
       return
     }
 
@@ -133,88 +178,132 @@ module.exports = class NoiseSecretStream extends Duplex {
       return
     }
 
-    const end = message.length - ABYTES
-    const plain = message.subarray(0, end)
-    this._rx.next(message, plain)
-    this.onmessage(plain)
+    const plain = message.subarray(1, message.byteLength - ABYTES + 1)
+
+    try {
+      this._decrypt.next(message, plain)
+    } catch (err) {
+      this.destroy(err)
+      return
+    }
+
+    if (this.push(plain) === false) {
+      this.rawStream.pause()
+    }
   }
 
-  onmessage (message) {
-    this.emit('message', message)
+  _onhandshakert (h) {
+    if (this._handshakeDone === null) return
+
+    if (h !== null) {
+      if (h.data) this._rawStream.write(h.data)
+      if (!h.tx) return
+    }
+
+    const done = this._handshakeDone
+    const publicKey = this._handshake.keyPair.publicKey
+
+    this._handshakeDone = null
+    this._handshake = null
+
+    if (h === null) return done(new Error('Noise handshake failed'))
+
+    this._setupSecretStream(h.tx, h.rx, h.handshakeHash, publicKey, h.remotePublicKey)
+    done(null)
+  }
+
+  _setupSecretStream (tx, rx, handshakeHash, publicKey, remotePublicKey) {
+    const buf = Buffer.allocUnsafe(3 + HEADERBYTES)
+    writeUint24le(HEADERBYTES, buf)
+
+    this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3))
+    this._decrypt = new Pull(rx.subarray(0, KEYBYTES))
+
+    this.publicKey = publicKey
+    this.remotePublicKey = remotePublicKey
+    this.handshakeHash = handshakeHash
+
+    this._rawStream.write(buf)
+  }
+
+  _openP (cb) {
+    this._openPromise.then(
+      ([isInitiator, rawStream, opts]) => {
+        this._config(isInitiator, rawStream, opts)
+        this._openPromise = null
+        this._open(cb)
+      },
+      cb
+    )
+  }
+
+  _open (cb) {
+    if (this._encrypt !== null) return cb(null)
+    if (this._openPromise) return this._openP(cb)
+
+    this._handshakeDone = cb
+    if (this.isInitiator) this._onhandshakert(this._handshake.send())
+
+    this._rawStream.on('data', this._onrawdata.bind(this))
+    this._rawStream.on('end', this._onrawend.bind(this))
+    this._rawStream.on('drain', this._onrawdrain.bind(this))
+
+    this.rawStream.on('error', this.destroy.bind(this))
+    this.rawStream.on('close', this.destroy.bind(this, null))
+  }
+
+  _predestroy () {
+    if (this._handshakeDone !== null) {
+      const done = this._handshakeDone
+      this._handshakeDone = null
+      this.rawStream.destroy()
+      done(new Error('Stream destroyed'))
+    }
+
+    if (this._drainDone !== null) {
+      const done = this._drainDone
+      this._drainDone = null
+      this.rawStream.destroy()
+      done(new Error('Stream destroyed'))
+    }
+  }
+
+  _write (data, cb) {
+    let wrapped = this._outgoingWrapped
+
+    if (data !== this._outgoingPlain) {
+      wrapped = Buffer.allocUnsafe(data.byteLength + 3 + ABYTES)
+      wrapped.set(data, 4)
+    } else {
+      this._outgoingWrapped = this._outgoingPlain = null
+    }
+
+    writeUint24le(wrapped.byteLength - 3, wrapped)
+    this._encrypt.next(wrapped.subarray(4, 4 + data.byteLength), wrapped.subarray(3))
+
+    if (this._rawStream.write(wrapped) === false) {
+      this._drainDone = cb
+    } else {
+      cb(null)
+    }
+  }
+
+  _final (cb) {
+    this._rawStream.end()
+    cb(null)
+  }
+
+  _destroy (cb) {
+    // TODO: pass cb to rawStream
+    this.rawStream.destroy()
+    cb(null)
   }
 
   alloc (len) {
     const buf = Buffer.allocUnsafe(len + 3 + ABYTES)
-    this._outgoing = buf
-    this._outgoingPlain = buf.subarray(4, buf.length - ABYTES + 1)
+    this._outgoingWrapped = buf
+    this._outgoingPlain = buf.subarray(4, buf.byteLength - ABYTES + 1)
     return this._outgoingPlain
-  }
-
-  send (message) {
-    const inplace = message === this._outgoingPlain
-    const buf = inplace
-      ? this._outgoing
-      : Buffer.allocUnsafe(message.length + 3 + ABYTES)
-
-    this._outgoing = this._outgoingPlain = null
-    writeUint24le(buf.length - 3, buf)
-
-    if (this._outgoingPending !== null) {
-      if (inplace === false) buf.set(message, 4)
-      this._outgoingPending.push(buf)
-      return false
-    }
-
-    this._tx.next(message, buf.subarray(3))
-    return this.push(buf)
-  }
-
-  _handshakeRT () {
-    const split = noise.writeMessage(this._noiseHandshake, EMPTY, this._noiseHandshakeBuffer.subarray(3))
-    writeUint24le(noise.writeMessage.bytes, this._noiseHandshakeBuffer)
-    const message = this._noiseHandshakeBuffer.subarray(0, 3 + noise.writeMessage.bytes)
-    if (split) this._onhandshake(split, [message])
-    else this.push(message)
-  }
-
-  _onhandshake ({ tx, rx }, pendingBuffers) {
-    this.remotePublicKey = Buffer.from(this._noiseHandshake.rs)
-    noise.destroy(this._noiseHandshake)
-    this._noiseHandshake = null
-
-    const buf = Buffer.allocUnsafe(3 + HEADERBYTES)
-    writeUint24le(HEADERBYTES, buf)
-
-    // the key copy is suboptimal but to reduce secure memory overhead on linux with default settings
-    // better fix is to batch mallocs in noise-protocol
-
-    this._tx = new Push(Buffer.from(tx.subarray(0, KEYBYTES)), undefined, buf.subarray(3))
-    this._rx = new Pull(Buffer.from(rx.subarray(0, KEYBYTES)))
-
-    sodium.sodium_free(rx)
-    sodium.sodium_free(tx)
-
-    this.emit('connect')
-    if (this.destroying) return
-
-    pendingBuffers.push(buf)
-
-    for (const out of this._outgoingPending) {
-      this._tx.next(out.subarray(4, out.length - ABYTES + 1), out.subarray(3))
-      pendingBuffers.push(out)
-    }
-
-    this._outgoingPending = null
-    this.push(pendingBuffers.length === 1 ? pendingBuffers[0] : Buffer.concat(pendingBuffers))
-  }
-
-  _destroy (cb) {
-    if (this._noiseHandshake !== null) {
-      noise.destroy(this._noiseHandshake)
-      this._noiseHandshake = null
-    }
-
-    cb(null)
   }
 }
 
