@@ -76,13 +76,41 @@ tape('works with tiny chunks', function (t) {
   })
 })
 
+tape('async creation', function (t) {
+  const server = net.createServer(function (socket) {
+    const s = new NoiseStream(false, socket)
+
+    s.on('data', function (data) {
+      s.destroy()
+      t.same(data, Buffer.from('encrypted!'))
+    })
+  })
+
+  server.listen(0, function () {
+    const s = NoiseStream.async(async () => {
+      const socket = net.connect(server.address().port)
+      await new Promise((resolve) => socket.once('connect', resolve))
+      return [true, socket]
+    })
+
+    s.write(Buffer.from('encrypted!'))
+    s.on('close', function () {
+      server.close()
+    })
+  })
+
+  server.on('close', function () {
+    t.end()
+  })
+})
+
 tape('send and recv lots of data', function (t) {
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
-  const buf = Buffer.alloc(65536)
+  const buf = crypto.randomBytes(65536)
   let size = 1024 * 1024 * 1024 // 1gb
 
   const r = new Readable({
@@ -98,12 +126,15 @@ tape('send and recv lots of data', function (t) {
 
   const then = Date.now()
   let recv = 0
+  let same = true
 
   b.on('data', function (data) {
+    if (same) same = data.equals(buf)
     recv += data.byteLength
   })
   b.on('end', function () {
     t.same(recv, 1024 * 1024 * 1024)
+    t.ok(same, 'data was the same')
     t.pass('1gb transfer took ' + (Date.now() - then) + 'ms')
     t.end()
   })

@@ -1,24 +1,27 @@
 const { Duplex } = require('streamx')
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
-const PassThrough = require('./lib/passthrough')
+const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
     super()
 
+    const promise = opts.async
+
     this.isInitiator = isInitiator
-    this.rawStream = rawStream || new PassThrough()
+    this.rawStream = null
 
     this.publicKey = null
     this.remotePublicKey = null
     this.handshakeHash = null
 
     // unwrapped raw stream
-    this._rawStream = rawStream || this.rawStream.reverse
+    this._rawStream = null
+    this._openPromise = promise || null
 
     // handshake state
-    this._handshake = opts.tx ? null : new Handshake(this.isInitiator, opts.keyPair || Handshake.keyPair(), 'XX')
+    this._handshake = null
     this._handshakeDone = null
 
     // message parsing state
@@ -35,19 +38,44 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._encrypt = null
     this._decrypt = null
 
-    if (opts.tx) {
-      this._setupSecretStream(opts.tx, opts.rx, opts.handshakeHash, opts.publicKey, opts.remotePublicKey)
-    } else {
-      this.publicKey = this._handshake.keyPair.publicKey
-    }
+    if (!promise) this._config(isInitiator, rawStream, opts)
 
     // wiggle it to trigger open immediately (TODO add streamx option for this)
     this.resume()
     this.pause()
   }
 
+  static async (promise) {
+    if (typeof promise === 'function') promise = promise() // support async functions
+    return new NoiseSecretStream(false, null, { async: promise })
+  }
+
   static keyPair (seed) {
     return Handshake.keyPair(seed)
+  }
+
+  _config (isInitiator, rawStream, opts = {}) {
+    this.isInitiator = isInitiator
+
+    if (rawStream) {
+      this.rawStream = rawStream
+      this._rawStream = rawStream
+      if (typeof this.rawStream.setContentSize === 'function') {
+        this._utp = rawStream
+      }
+    } else {
+      this.rawStream = rawStream || new Bridge()
+      this._rawStream = this.rawStream.reverse
+    }
+
+
+    if (opts.handshake) {
+      const { tx, rx, handshakeHash, publicKey, remotePublicKey } = opts.handshake
+      this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
+    } else {
+      this._handshake = new Handshake(this.isInitiator, opts.keyPair || Handshake.keyPair(), 'XX')
+      this.publicKey = this._handshake.keyPair.publicKey
+    }
   }
 
   _onrawdata (data) {
@@ -181,8 +209,20 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.write(buf)
   }
 
+  _openP (cb) {
+    this._openPromise.then(
+      ([isInitiator, rawStream, opts]) => {
+        this._config(isInitiator, rawStream, opts)
+        this._openPromise = null
+        this._open(cb)
+      },
+      cb
+    )
+  }
+
   _open (cb) {
     if (this._encrypt !== null) return cb(null)
+    if (this._openPromise) return this._openP(cb)
 
     this._handshakeDone = cb
     if (this.isInitiator) this._onhandshakert(this._handshake.send())
