@@ -58,6 +58,11 @@ module.exports = class NoiseSecretStream extends Stream {
     return Handshake.keyPair(seed)
   }
 
+  static id (handshakeHash, id = Buffer.allocUnsafe(32)) {
+    sodium.crypto_generichash(id, handshakeHash, NS)
+    return id
+  }
+
   start (rawStream, opts = {}) {
     if (rawStream) {
       this.rawStream = rawStream
