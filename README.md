@@ -66,17 +66,19 @@ Options include:
 The NoiseSecretStream returned is a Duplex stream that you use as as normal stream, to write/read data from,
 except it's payloads are encrypted using the libsodium secretstream.
 
-#### `const s = NoiseSecretStream.async(async func)`
+#### `s.start(rawStream, [options])`
 
-Create a NoiseSecretStream from an async contructor.
-The async function passed is expected to return the arguments that should be passed to the constructor
-as an array, ie:
+Start a NoiseSecretStream from a rawStream asynchrously.
 
 ``` js
-const s = NoiseSecretStream.async(async function () {
-  const socket = await connectAsyncToSocket(...)
-  const opts = ...
-  return [true, socket, opts] // [isInitiator, rawStream, opts]
+const s = new NoiseSecretStream({
+  autoStart: false // call start manually
+})
+
+// ... do async stuff or destroy the stream
+
+s.start(rawStream, {
+  ... options from above
 })
 ```
 

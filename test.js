@@ -275,7 +275,7 @@ tape('handshake function', async function (t) {
 })
 
 tape('rawStream and noise stream are "messengers"', function (t) {
-  t.plan(7)
+  t.plan(11)
 
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
@@ -290,8 +290,16 @@ tape('rawStream and noise stream are "messengers"', function (t) {
     t.same(a.rawStream.remotePublicKey, a.remotePublicKey)
   })
 
+  b.recv(function (data) {
+    t.same(data, Buffer.from('hello world'), 'recv: hello world')
+  })
+
   b.rawStream.recv(function (data) {
     t.same(data, Buffer.from('hello world'), 'recv: hello world')
+  })
+
+  a.recv(function (data) {
+    t.same(data, Buffer.from('hej verden'), 'recv: hej verden')
   })
 
   a.rawStream.recv(function (data) {
