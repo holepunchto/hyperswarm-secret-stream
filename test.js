@@ -1,5 +1,6 @@
 const tape = require('tape')
 const net = require('net')
+const Events = require('events')
 const crypto = require('crypto')
 const { Readable } = require('streamx')
 const NoiseStream = require('./')
@@ -110,10 +111,15 @@ tape('async creation', function (t) {
   })
 
   server.listen(0, function () {
-    const s = NoiseStream.async(async () => {
-      const socket = net.connect(server.address().port)
-      await new Promise((resolve) => socket.once('connect', resolve))
-      return [true, socket]
+    const s = new NoiseStream(true, null, {
+      autoStart: false
+    })
+
+    t.notOk(s.rawStream, 'not started')
+
+    const socket = net.connect(server.address().port)
+    socket.on('connect', function () {
+      s.start(socket)
     })
 
     s.write(Buffer.from('encrypted!'))
@@ -224,3 +230,131 @@ tape('send garbage secretstream payload data', function (t) {
     a.rawStream.write(crypto.randomBytes(0xff))
   })
 })
+
+tape('handshake outside', async function (t) {
+  const hs = await createHandshake()
+
+  const a = new NoiseStream(true, null, {
+    handshake: hs[0]
+  })
+
+  const b = new NoiseStream(false, null, {
+    handshake: hs[1]
+  })
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.write('test')
+
+  const [data] = await Events.once(b, 'data')
+  t.same(data, Buffer.from('test'))
+  t.end()
+})
+
+tape('handshake outside', async function (t) {
+  const hs = await createHandshake()
+
+  const a = new NoiseStream(true, null, {
+    handshake: hs[0]
+  })
+
+  const b = new NoiseStream(false, null, {
+    handshake: hs[1]
+  })
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.write('test')
+
+  const [data] = await Events.once(b, 'data')
+  t.same(data, Buffer.from('test'))
+  t.end()
+})
+
+tape('handshake function', async function (t) {
+  const hs = await createHandshake()
+
+  const a = new NoiseStream(true, null, {
+    handshake: hs[0]
+  })
+
+  const b = new NoiseStream(false, null, {
+    handshake (id) {
+      t.same(id, a.id, 'same handshake id')
+      return hs[1]
+    }
+  })
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.write('test')
+
+  const [data] = await Events.once(b, 'data')
+  t.same(data, Buffer.from('test'))
+  t.end()
+})
+
+tape('rawStream and noise stream are "messengers"', function (t) {
+  t.plan(7)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  let handshook = false
+  a.on('handshake', () => { handshook = true })
+  a.rawStream.on('handshake', function () {
+    t.ok(handshook, 'noise stream handshake completed')
+    t.same(a.rawStream.publicKey, a.publicKey)
+    t.same(a.rawStream.remotePublicKey, a.remotePublicKey)
+  })
+
+  b.rawStream.recv(function (data) {
+    t.same(data, Buffer.from('hello world'), 'recv: hello world')
+  })
+
+  a.rawStream.recv(function (data) {
+    t.same(data, Buffer.from('hej verden'), 'recv: hej verden')
+  })
+
+  a.rawStream.send(Buffer.from('hello world'))
+  a.send(Buffer.from('hello world'))
+
+  b.rawStream.send(Buffer.from('hej verden'))
+  b.send(Buffer.from('hej verden'))
+})
+
+function createHandshake () {
+  return new Promise((resolve, reject) => {
+    const a = new NoiseStream(true)
+    const b = new NoiseStream(false)
+
+    let missing = 2
+
+    a.on('handshake', onhandshake)
+    b.on('handshake', onhandshake)
+
+    a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+    function onhandshake () {
+      if (--missing === 0) {
+        a.destroy()
+        b.destroy()
+        resolve([{
+          publicKey: a.publicKey,
+          remotePublicKey: a.remotePublicKey,
+          handshakeHash: a.handshakeHash,
+          tx: a._encrypt.key,
+          rx: a._decrypt.key
+        }, {
+          publicKey: b.publicKey,
+          remotePublicKey: b.remotePublicKey,
+          handshakeHash: b.handshakeHash,
+          tx: b._encrypt.key,
+          rx: b._decrypt.key
+        }])
+      }
+    }
+  })
+}
