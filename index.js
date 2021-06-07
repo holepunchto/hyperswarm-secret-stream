@@ -321,6 +321,7 @@ module.exports = class NoiseSecretStream extends Stream {
     }
 
     writeUint24le(wrapped.byteLength - 3, wrapped)
+    // offset 4 so we can do it in-place
     this._encrypt.next(wrapped.subarray(4, 4 + data.byteLength), wrapped.subarray(3))
 
     if (this._rawStream.write(wrapped) === false) {
