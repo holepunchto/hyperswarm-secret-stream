@@ -195,12 +195,7 @@ module.exports = class NoiseSecretStream extends Stream {
           this._onid(expectedId)
         }
 
-        if (this._decrypt === null) {
-          this.destroy(new Error('Invalid handshake'))
-          return
-        }
-
-        if (!this.id || !this.id.equals(expectedId)) {
+        if (this._decrypt === null || !this.id || !this.id.equals(expectedId)) {
           this.destroy(new Error('Remote does not agree on the stream id'))
           return
         }
