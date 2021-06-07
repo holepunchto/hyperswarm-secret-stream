@@ -1,13 +1,17 @@
-const { Duplex } = require('streamx')
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
+const sodium = require('sodium-universal')
+const Stream = require('./lib/stream')
 const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
-module.exports = class NoiseSecretStream extends Duplex {
-  constructor (isInitiator, rawStream, opts = {}) {
-    super()
+const IDHEADERBYTES = HEADERBYTES + 32
+const NS = Buffer.alloc(32)
 
-    const promise = opts.async
+sodium.crypto_generichash(NS, Buffer.from('NoiseSecretStream_XChaCha20Poly1305'))
+
+module.exports = class NoiseSecretStream extends Stream {
+  constructor (isInitiator, rawStream, opts = {}) {
+    super(null)
 
     this.isInitiator = isInitiator
     this.rawStream = null
@@ -15,15 +19,16 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.publicKey = null
     this.remotePublicKey = null
     this.handshakeHash = null
+    this.id = null
 
     // pointer for upstream to set data here if they want
     this.userData = null
 
     // unwrapped raw stream
     this._rawStream = null
-    this._openPromise = promise || null
 
     // handshake state
+    this._idToHandshake = null
     this._handshake = null
     this._handshakeDone = null
 
@@ -33,6 +38,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._tmp = 1
     this._message = null
 
+    this._startDone = null
     this._drainDone = null
     this._outgoingPlain = null
     this._outgoingWrapped = null
@@ -41,25 +47,18 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._encrypt = null
     this._decrypt = null
 
-    if (!promise) this._config(isInitiator, rawStream, opts)
+    if (opts.autoStart !== false) this.start(rawStream, opts)
 
     // wiggle it to trigger open immediately (TODO add streamx option for this)
     this.resume()
     this.pause()
   }
 
-  static async (promise) {
-    if (typeof promise === 'function') promise = promise() // support async functions
-    return new NoiseSecretStream(false, null, { async: promise })
-  }
-
   static keyPair (seed) {
     return Handshake.keyPair(seed)
   }
 
-  _config (isInitiator, rawStream, opts = {}) {
-    this.isInitiator = isInitiator
-
+  start (rawStream, opts = {}) {
     if (rawStream) {
       this.rawStream = rawStream
       this._rawStream = rawStream
@@ -67,16 +66,24 @@ module.exports = class NoiseSecretStream extends Duplex {
         this._utp = rawStream
       }
     } else {
-      this.rawStream = rawStream || new Bridge()
+      this.rawStream = new Bridge(this)
       this._rawStream = this.rawStream.reverse
     }
 
-    if (opts.handshake) {
+    if (typeof opts.handshake === 'function') {
+      this._idToHandshake = opts.handshake
+    } else if (opts.handshake) {
       const { tx, rx, handshakeHash, publicKey, remotePublicKey } = opts.handshake
       this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
     } else {
       this._handshake = new Handshake(this.isInitiator, opts.keyPair || Handshake.keyPair(), 'XX')
       this.publicKey = this._handshake.keyPair.publicKey
+    }
+
+    if (this._startDone !== null) {
+      const done = this._startDone
+      this._startDone = null
+      this._open(done)
     }
   }
 
@@ -86,13 +93,13 @@ module.exports = class NoiseSecretStream extends Duplex {
     do {
       switch (this._state) {
         case 0: {
-          while (this._tmp !== 16777216 && offset < data.length) {
+          while (this._tmp !== 0x1000000 && offset < data.length) {
             const v = data[offset++]
             this._len += this._tmp * v
             this._tmp *= 256
           }
 
-          if (this._tmp === 16777216) {
+          if (this._tmp === 0x1000000) {
             this._tmp = 0
             this._state = 1
             const unprocessed = data.length - offset
@@ -151,6 +158,20 @@ module.exports = class NoiseSecretStream extends Duplex {
     cb(null)
   }
 
+  _onid (id) {
+    const hs = this._idToHandshake(id)
+
+    const done = this._handshakeDone
+    this._handshakeDone = null
+
+    if (!hs) {
+      done(new Error('No handshake provided'))
+    } else {
+      this._setupSecretStream(hs.tx, hs.rx, hs.handshakeHash, hs.publicKey, hs.remotePublicKey)
+      done(null)
+    }
+  }
+
   _incoming () {
     const message = this._message
 
@@ -162,12 +183,28 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this._setup === true) {
       if (this._handshake) {
         this._onhandshakert(this._handshake.recv(message))
-      } else if (this._decrypt !== null) {
-        if (message.byteLength !== HEADERBYTES) {
+      } else {
+        if (message.byteLength !== IDHEADERBYTES) {
           this.destroy(new Error('Invalid header message received'))
           return
         }
-        this._decrypt.init(message)
+
+        const expectedId = message.subarray(0, 32)
+
+        if (this._idToHandshake !== null) {
+          this._onid(expectedId)
+        }
+
+        if (this._decrypt === null) {
+          this.destroy(new Error('Invalid handshake'))
+          return
+        }
+
+        if (!this.id || !this.id.equals(expectedId)) {
+          this.destroy(new Error('Remote does not agree on the stream id'))
+          return
+        }
+        this._decrypt.init(message.subarray(32))
         this._setup = false // setup is now done
       }
       return
@@ -213,32 +250,33 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _setupSecretStream (tx, rx, handshakeHash, publicKey, remotePublicKey) {
-    const buf = Buffer.allocUnsafe(3 + HEADERBYTES)
-    writeUint24le(HEADERBYTES, buf)
+    const buf = Buffer.allocUnsafe(3 + IDHEADERBYTES)
+    writeUint24le(IDHEADERBYTES, buf)
 
-    this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3))
+    this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3 + 32))
     this._decrypt = new Pull(rx.subarray(0, KEYBYTES))
 
     this.publicKey = publicKey
     this.remotePublicKey = remotePublicKey
     this.handshakeHash = handshakeHash
+    this.id = buf.subarray(3, 3 + 32)
+
+    sodium.crypto_generichash(this.id, handshakeHash, NS)
+
+    this.emit('handshake')
+    // if rawStream is a bridge, also emit it there
+    if (this.rawStream !== this._rawStream) this.rawStream.emit('handshake')
+
+    if (this.destroying) return
 
     this._rawStream.write(buf)
   }
 
-  _openP (cb) {
-    this._openPromise.then(
-      ([isInitiator, rawStream, opts]) => {
-        this._config(isInitiator, rawStream, opts)
-        this._openPromise = null
-        this._open(cb)
-      },
-      cb
-    )
-  }
-
   _open (cb) {
-    if (this._openPromise) return this._openP(cb)
+    if (this._rawStream === null) { // no autostart
+      this._startDone = cb
+      return
+    }
 
     this._rawStream.on('data', this._onrawdata.bind(this))
     this._rawStream.on('end', this._onrawend.bind(this))
@@ -250,10 +288,17 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this._encrypt !== null) return cb(null)
 
     this._handshakeDone = cb
+
     if (this.isInitiator) this._onhandshakert(this._handshake.send())
   }
 
   _predestroy () {
+    if (this._startDone !== null) {
+      const done = this._startDone
+      this._startDone = null
+      done(new Error('Stream destroyed'))
+    }
+
     if (this._handshakeDone !== null) {
       const done = this._handshakeDone
       this._handshakeDone = null
@@ -273,6 +318,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     let wrapped = this._outgoingWrapped
 
     if (data !== this._outgoingPlain) {
+      if (typeof data === 'string') data = Buffer.from(data)
       wrapped = Buffer.allocUnsafe(data.byteLength + 3 + ABYTES)
       wrapped.set(data, 4)
     } else {
