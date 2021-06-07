@@ -251,26 +251,6 @@ tape('handshake outside', async function (t) {
   t.end()
 })
 
-tape('handshake outside', async function (t) {
-  const hs = await createHandshake()
-
-  const a = new NoiseStream(true, null, {
-    handshake: hs[0]
-  })
-
-  const b = new NoiseStream(false, null, {
-    handshake: hs[1]
-  })
-
-  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
-
-  a.write('test')
-
-  const [data] = await Events.once(b, 'data')
-  t.same(data, Buffer.from('test'))
-  t.end()
-})
-
 tape('handshake function', async function (t) {
   const hs = await createHandshake()
 
