@@ -75,21 +75,47 @@ module.exports = class NoiseSecretStream extends Stream {
       this._rawStream = this.rawStream.reverse
     }
 
-    if (typeof opts.handshake === 'function') {
-      this._idToHandshake = opts.handshake
-    } else if (opts.handshake) {
-      const { tx, rx, handshakeHash, publicKey, remotePublicKey } = opts.handshake
-      this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
-    } else {
-      this._handshake = new Handshake(this.isInitiator, opts.keyPair || Handshake.keyPair(), 'XX')
-      this.publicKey = this._handshake.keyPair.publicKey
-    }
+    this._startHandshake(opts.handshake, opts.keyPair || null)
 
     if (this._startDone !== null) {
       const done = this._startDone
       this._startDone = null
       this._open(done)
     }
+  }
+
+  _startHandshake (handshake, keyPair) {
+    if (typeof handshake === 'function') {
+      this._idToHandshake = handshake
+    } else if (handshake) {
+      const { tx, rx, handshakeHash, publicKey, remotePublicKey } = handshake
+      this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
+    } else {
+      this._handshake = new Handshake(this.isInitiator, keyPair || Handshake.keyPair(), 'XX')
+      this.publicKey = this._handshake.keyPair.publicKey
+    }
+  }
+
+  _endHandshake (id, header) {
+    if (this._idToHandshake !== null) {
+      const hs = this._idToHandshake(id)
+      const done = this._handshakeDone
+      this._handshakeDone = null
+
+      if (!hs) {
+        done(new Error('No handshake provided'))
+      } else {
+        this._setupSecretStream(hs.tx, hs.rx, hs.handshakeHash, hs.publicKey, hs.remotePublicKey)
+        done(null)
+      }
+    }
+
+    if (this._decrypt === null || !this.id || !this.id.equals(id)) {
+      return false
+    }
+
+    this._decrypt.init(header)
+    return true
   }
 
   _onrawdata (data) {
@@ -163,20 +189,6 @@ module.exports = class NoiseSecretStream extends Stream {
     cb(null)
   }
 
-  _onid (id) {
-    const hs = this._idToHandshake(id)
-
-    const done = this._handshakeDone
-    this._handshakeDone = null
-
-    if (!hs) {
-      done(new Error('No handshake provided'))
-    } else {
-      this._setupSecretStream(hs.tx, hs.rx, hs.handshakeHash, hs.publicKey, hs.remotePublicKey)
-      done(null)
-    }
-  }
-
   _incoming () {
     const message = this._message
 
@@ -195,16 +207,13 @@ module.exports = class NoiseSecretStream extends Stream {
         }
 
         const expectedId = message.subarray(0, 32)
+        const header = message.subarray(32)
 
-        if (this._idToHandshake !== null) {
-          this._onid(expectedId)
-        }
-
-        if (this._decrypt === null || !this.id || !this.id.equals(expectedId)) {
-          this.destroy(new Error('Remote does not agree on the stream id'))
+        if (this._endHandshake(expectedId, header) === false) {
+          this.destroy(new Error('Invalid header received'))
           return
         }
-        this._decrypt.init(message.subarray(32))
+
         this._setup = false // setup is now done
       }
       return
