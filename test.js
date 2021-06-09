@@ -274,45 +274,6 @@ tape('handshake function', async function (t) {
   t.end()
 })
 
-tape('rawStream and noise stream are "messengers"', function (t) {
-  t.plan(11)
-
-  const a = new NoiseStream(true)
-  const b = new NoiseStream(false)
-
-  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
-
-  let handshook = false
-  a.on('handshake', () => { handshook = true })
-  a.rawStream.on('handshake', function () {
-    t.ok(handshook, 'noise stream handshake completed')
-    t.same(a.rawStream.publicKey, a.publicKey)
-    t.same(a.rawStream.remotePublicKey, a.remotePublicKey)
-  })
-
-  b.recv(function (data) {
-    t.same(data, Buffer.from('hello world'), 'recv: hello world')
-  })
-
-  b.rawStream.recv(function (data) {
-    t.same(data, Buffer.from('hello world'), 'recv: hello world')
-  })
-
-  a.recv(function (data) {
-    t.same(data, Buffer.from('hej verden'), 'recv: hej verden')
-  })
-
-  a.rawStream.recv(function (data) {
-    t.same(data, Buffer.from('hej verden'), 'recv: hej verden')
-  })
-
-  a.rawStream.send(Buffer.from('hello world'))
-  a.send(Buffer.from('hello world'))
-
-  b.rawStream.send(Buffer.from('hej verden'))
-  b.send(Buffer.from('hej verden'))
-})
-
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)

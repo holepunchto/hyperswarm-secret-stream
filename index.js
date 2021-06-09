@@ -1,6 +1,6 @@
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
 const sodium = require('sodium-universal')
-const Stream = require('./lib/stream')
+const { Duplex } = require('streamx')
 const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
@@ -9,10 +9,11 @@ const NS = Buffer.alloc(32)
 
 sodium.crypto_generichash(NS, Buffer.from('NoiseSecretStream_XChaCha20Poly1305'))
 
-module.exports = class NoiseSecretStream extends Stream {
+module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
-    super(null)
+    super()
 
+    this.noiseStream = this
     this.isInitiator = isInitiator
     this.rawStream = null
 
