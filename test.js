@@ -274,6 +274,41 @@ tape('handshake function', async function (t) {
   t.end()
 })
 
+tape('errors are forwarded', async function (t) {
+  t.plan(4)
+
+  let same
+
+  const promise = new Promise((resolve) => {
+    let plan = 4
+
+    same = (a, b, m) => {
+      t.same(a, b, m)
+      if (--plan <= 0) resolve()
+    }
+  })
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  await new Promise((resolve) => a.on('handshake', resolve))
+
+  const error = new Error('hello')
+
+  a.destroy(error)
+  b.destroy(error)
+
+  a.rawStream.on('error', (err) => same(err, error))
+  b.rawStream.on('error', (err) => same(err, error))
+
+  a.on('error', (err) => same(err, error))
+  b.on('error', (err) => same(err, error))
+
+  return promise
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)

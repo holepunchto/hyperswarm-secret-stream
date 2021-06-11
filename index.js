@@ -352,8 +352,8 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _destroy (cb) {
-    // TODO: pass cb to rawStream
-    if (this.rawStream) this.rawStream.destroy()
+    const error = this._readableState.error || this._writableState.error
+    if (this.rawStream) this.rawStream.destroy(error)
     cb(null)
   }
 
