@@ -17,8 +17,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.isInitiator = isInitiator
     this.rawStream = null
 
-    this.publicKey = null
-    this.remotePublicKey = null
+    this.publicKey = opts.publicKey || null
+    this.remotePublicKey = opts.remotePublicKey || null
     this.handshakeHash = null
     this.id = null
 
