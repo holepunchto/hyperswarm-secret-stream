@@ -76,6 +76,9 @@ module.exports = class NoiseSecretStream extends Duplex {
       this._rawStream = this.rawStream.reverse
     }
 
+    this.rawStream.on('error', this.destroy.bind(this))
+    this.rawStream.on('close', this.destroy.bind(this, null))
+
     this._startHandshake(opts.handshake, opts.keyPair || null)
 
     if (this._startDone !== null) {
@@ -291,9 +294,6 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.on('data', this._onrawdata.bind(this))
     this._rawStream.on('end', this._onrawend.bind(this))
     this._rawStream.on('drain', this._onrawdrain.bind(this))
-
-    this.rawStream.on('error', this.destroy.bind(this))
-    this.rawStream.on('close', this.destroy.bind(this, null))
 
     if (this._encrypt !== null) return cb(null)
 
