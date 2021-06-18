@@ -2,7 +2,7 @@ const tape = require('tape')
 const net = require('net')
 const Events = require('events')
 const crypto = require('crypto')
-const { Readable } = require('streamx')
+const { Readable, Duplex } = require('streamx')
 const NoiseStream = require('./')
 
 tape('basic', function (t) {
@@ -307,6 +307,20 @@ tape('errors are forwarded', async function (t) {
   b.on('error', (err) => same(err, error))
 
   return promise
+})
+
+tape('can destroy in the first tick', function (t) {
+  t.plan(1)
+
+  const stream = new Duplex()
+  const a = new NoiseStream(true, stream)
+
+  a.on('error', function (err) {
+    t.same(err, new Error('stop'))
+  })
+
+  // hackish destroy to force it in the first tick
+  stream.emit('error', new Error('stop'))
 })
 
 function createHandshake () {
