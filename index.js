@@ -87,9 +87,8 @@ module.exports = class NoiseSecretStream extends Duplex {
       this._open(done)
     }
 
-    if (opts.head) {
-      this._onrawdata(opts.head)
-    }
+    if (opts.data) this._onrawdata(opts.data)
+    if (opts.ended) this._onrawend()
   }
 
   _startHandshake (handshake, keyPair) {

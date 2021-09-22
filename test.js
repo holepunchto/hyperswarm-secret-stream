@@ -275,15 +275,15 @@ tape('pass in head buffer', async function (t) {
     if (expected.length === 0) done()
   })
 
-  const h = []
+  const buf = []
   a.rawStream.on('data', function ondata (head) {
-    h.push(head)
-    if (h.length === 2) {
+    buf.push(head)
+    if (buf.length === 2) {
       a.rawStream.removeListener('data', ondata)
 
       b.start(null, {
         handshake: hs[1],
-        head: Buffer.concat(h)
+        data: Buffer.concat(buf)
       })
 
       a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
