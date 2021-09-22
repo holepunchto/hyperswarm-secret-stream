@@ -4,7 +4,8 @@
   "description": "Secret stream backed by Noise and libsodium's secretstream",
   "main": "index.js",
   "dependencies": {
-    "noise-protocol": "^3.0.1",
+    "noise-curve-ed": "^1.0.2",
+    "noise-handshake": "^2.1.0",
     "sodium-secretstream": "^1.0.0",
     "sodium-universal": "^3.0.4",
     "streamx": "^2.10.2"

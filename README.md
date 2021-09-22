@@ -52,6 +52,8 @@ Options include:
 
 ```js
 {
+  pattern: 'XX', // which noise pattern to use
+  remotePublicKey, // set if your handshake requires it
   keyPair: { publicKey, secretKey },
   handshake: { // if you want to use an handshake performed elsewhere pass it here
     tx,
@@ -65,6 +67,8 @@ Options include:
 
 The NoiseSecretStream returned is a Duplex stream that you use as as normal stream, to write/read data from,
 except it's payloads are encrypted using the libsodium secretstream.
+
+Note that this uses ed25519 for the handshakes per default.
 
 #### `s.start(rawStream, [options])`
 
@@ -84,7 +88,7 @@ s.start(rawStream, {
 
 #### `keyPair = NoiseSecretStream.keyPair([seed])`
 
-Generate a key pair.
+Generate a ed25519 key pair.
 
 #### `s.publicKey`
 

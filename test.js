@@ -251,7 +251,7 @@ tape('handshake outside', async function (t) {
   t.end()
 })
 
-tape('handshake function', async function (t) {
+tape('pass in head buffer', async function (t) {
   const hs = await createHandshake()
 
   const a = new NoiseStream(true, null, {
@@ -259,19 +259,39 @@ tape('handshake function', async function (t) {
   })
 
   const b = new NoiseStream(false, null, {
-    handshake (id) {
-      t.same(id, a.id, 'same handshake id')
-      return hs[1]
+    autoStart: false
+  })
+
+  a.write('test1')
+  a.write('test2')
+
+  const expected = [Buffer.from('test1'), Buffer.from('test2'), Buffer.from('test3')]
+
+  let done
+  const promise = new Promise((resolve) => { done = resolve })
+
+  b.on('data', function (data) {
+    t.same(data, expected.shift())
+    if (expected.length === 0) done()
+  })
+
+  const h = []
+  a.rawStream.on('data', function ondata (head) {
+    h.push(head)
+    if (h.length === 2) {
+      a.rawStream.removeListener('data', ondata)
+
+      b.start(null, {
+        handshake: hs[1],
+        head: Buffer.concat(h)
+      })
+
+      a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+      a.write('test3')
     }
   })
 
-  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
-
-  a.write('test')
-
-  const [data] = await Events.once(b, 'data')
-  t.same(data, Buffer.from('test'))
-  t.end()
+  return promise
 })
 
 tape('errors are forwarded', async function (t) {

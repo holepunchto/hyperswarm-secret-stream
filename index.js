@@ -29,8 +29,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream = null
 
     // handshake state
-    this._idToHandshake = null
     this._handshake = null
+    this._handshakePattern = opts.pattern || null
     this._handshakeDone = null
 
     // message parsing state
@@ -86,40 +86,25 @@ module.exports = class NoiseSecretStream extends Duplex {
       this._startDone = null
       this._open(done)
     }
+
+    if (opts.head) {
+      this._onrawdata(opts.head)
+    }
   }
 
   _startHandshake (handshake, keyPair) {
-    if (typeof handshake === 'function') {
-      this._idToHandshake = handshake
-    } else if (handshake) {
+    if (handshake) {
       const { tx, rx, handshakeHash, publicKey, remotePublicKey } = handshake
       this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
-    } else {
-      this._handshake = new Handshake(this.isInitiator, keyPair || Handshake.keyPair(), 'XX')
-      this.publicKey = this._handshake.keyPair.publicKey
-    }
-  }
-
-  _endHandshake (id, header) {
-    if (this._idToHandshake !== null) {
-      const hs = this._idToHandshake(id)
-      const done = this._handshakeDone
-      this._handshakeDone = null
-
-      if (!hs) {
-        done(new Error('No handshake provided'))
-      } else {
-        this._setupSecretStream(hs.tx, hs.rx, hs.handshakeHash, hs.publicKey, hs.remotePublicKey)
-        done(null)
-      }
+      return
     }
 
-    if (this._decrypt === null || !this.id || !this.id.equals(id)) {
-      return false
-    }
+    if (!keyPair) keyPair = Handshake.keyPair()
+    const pattern = this._handshakePattern || 'XX'
+    const remotePublicKey = this.remotePublicKey
 
-    this._decrypt.init(header)
-    return true
+    this._handshake = new Handshake(this.isInitiator, keyPair, remotePublicKey, pattern)
+    this.publicKey = this._handshake.keyPair.publicKey
   }
 
   _onrawdata (data) {
@@ -213,11 +198,12 @@ module.exports = class NoiseSecretStream extends Duplex {
         const expectedId = message.subarray(0, 32)
         const header = message.subarray(32)
 
-        if (this._endHandshake(expectedId, header) === false) {
+        if (!this.id || !this.id.equals(expectedId)) {
           this.destroy(new Error('Invalid header received'))
           return
         }
 
+        this._decrypt.init(header)
         this._setup = false // setup is now done
       }
       return
