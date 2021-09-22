@@ -362,13 +362,13 @@ function createHandshake () {
         resolve([{
           publicKey: a.publicKey,
           remotePublicKey: a.remotePublicKey,
-          handshakeHash: a.handshakeHash,
+          hash: a.handshakeHash,
           tx: a._encrypt.key,
           rx: a._decrypt.key
         }, {
           publicKey: b.publicKey,
           remotePublicKey: b.remotePublicKey,
-          handshakeHash: b.handshakeHash,
+          hash: b.handshakeHash,
           tx: b._encrypt.key,
           rx: b._decrypt.key
         }])

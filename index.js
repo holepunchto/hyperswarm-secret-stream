@@ -93,8 +93,8 @@ module.exports = class NoiseSecretStream extends Duplex {
 
   _startHandshake (handshake, keyPair) {
     if (handshake) {
-      const { tx, rx, handshakeHash, publicKey, remotePublicKey } = handshake
-      this._setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey)
+      const { tx, rx, hash, publicKey, remotePublicKey } = handshake
+      this._setupSecretStream(tx, rx, hash, publicKey, remotePublicKey)
       return
     }
 
@@ -243,7 +243,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     if (h === null) return done(new Error('Noise handshake failed'))
 
-    this._setupSecretStream(h.tx, h.rx, h.handshakeHash, publicKey, h.remotePublicKey)
+    this._setupSecretStream(h.tx, h.rx, h.hash, publicKey, h.remotePublicKey)
     done(null)
   }
 
