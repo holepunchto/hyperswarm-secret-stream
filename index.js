@@ -5,9 +5,12 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-const NS = Buffer.alloc(32)
+const NS = Buffer.alloc(64)
+const NS_INITIATOR = NS.subarray(0, 32)
+const NS_RESPONDER = NS.subarray(32, 64)
 
-sodium.crypto_generichash(NS, Buffer.from('NoiseSecretStream_XChaCha20Poly1305'))
+sodium.crypto_generichash(NS_INITIATOR, Buffer.from('NoiseSecretStream_Initiator_XChaCha20Poly1305'))
+sodium.crypto_generichash(NS_RESPONDER, Buffer.from('NoiseSecretStream_Responder_XChaCha20Poly1305'))
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
@@ -20,7 +23,6 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.publicKey = opts.publicKey || null
     this.remotePublicKey = opts.remotePublicKey || null
     this.handshakeHash = null
-    this.id = null
 
     // pointer for upstream to set data here if they want
     this.userData = null
@@ -59,9 +61,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     return Handshake.keyPair(seed)
   }
 
-  static id (handshakeHash, id = Buffer.allocUnsafe(32)) {
-    sodium.crypto_generichash(id, handshakeHash, NS)
-    return id
+  static id (handshakeHash, isInitiator, id) {
+    return streamId(handshakeHash, isInitiator, id)
   }
 
   start (rawStream, opts = {}) {
@@ -194,10 +195,11 @@ module.exports = class NoiseSecretStream extends Duplex {
           return
         }
 
-        const expectedId = message.subarray(0, 32)
+        const remoteId = message.subarray(0, 32)
+        const expectedId = streamId(this.handshakeHash, !this.isInitiator)
         const header = message.subarray(32)
 
-        if (!this.id || !this.id.equals(expectedId)) {
+        if (!expectedId.equals(remoteId)) {
           this.destroy(new Error('Invalid header received'))
           return
         }
@@ -257,9 +259,9 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.publicKey = publicKey
     this.remotePublicKey = remotePublicKey
     this.handshakeHash = handshakeHash
-    this.id = buf.subarray(3, 3 + 32)
 
-    sodium.crypto_generichash(this.id, handshakeHash, NS)
+    const id = buf.subarray(3, 3 + 32)
+    streamId(handshakeHash, this.isInitiator, id)
 
     this.emit('handshake')
     // if rawStream is a bridge, also emit it there
@@ -354,4 +356,9 @@ function writeUint24le (n, buf) {
   buf[0] = (n & 255)
   buf[1] = (n >>> 8) & 255
   buf[2] = (n >>> 16) & 255
+}
+
+function streamId (handshakeHash, isInitiator, out = Buffer.allocUnsafe(32)) {
+  sodium.crypto_generichash(out, handshakeHash, isInitiator ? NS_INITIATOR : NS_RESPONDER)
+  return out
 }
