@@ -27,6 +27,9 @@ module.exports = class NoiseSecretStream extends Duplex {
     // pointer for upstream to set data here if they want
     this.userData = null
 
+    let openedDone = null
+    this.opened = new Promise((resolve) => { openedDone = resolve })
+
     // unwrapped raw stream
     this._rawStream = null
 
@@ -41,6 +44,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._tmp = 1
     this._message = null
 
+    this._openedDone = openedDone
     this._startDone = null
     this._drainDone = null
     this._outgoingPlain = null
@@ -246,6 +250,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (h === null) return done(new Error('Noise handshake failed'))
 
     this._setupSecretStream(h.tx, h.rx, h.hash, publicKey, h.remotePublicKey)
+    this._resolveOpened(true)
     done(null)
   }
 
@@ -282,7 +287,10 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.on('end', this._onrawend.bind(this))
     this._rawStream.on('drain', this._onrawdrain.bind(this))
 
-    if (this._encrypt !== null) return cb(null)
+    if (this._encrypt !== null) {
+      this._resolveOpened(true)
+      return cb(null)
+    }
 
     this._handshakeDone = cb
 
@@ -338,7 +346,16 @@ module.exports = class NoiseSecretStream extends Duplex {
     cb(null)
   }
 
+  _resolveOpened (val) {
+    if (this._openedDone !== null) {
+      const opened = this._openedDone
+      this._openedDone = null
+      opened(val)
+    }
+  }
+
   _destroy (cb) {
+    this._resolveOpened(false)
     const error = this._readableState.error || this._writableState.error
     if (this.rawStream) this.rawStream.destroy(error)
     cb(null)
