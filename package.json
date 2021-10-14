@@ -1,6 +1,6 @@
 {
   "name": "@hyperswarm/secret-stream",
-  "version": "4.2.0",
+  "version": "5.0.0",
   "description": "Secret stream backed by Noise and libsodium's secretstream",
   "main": "index.js",
   "dependencies": {
