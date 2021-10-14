@@ -1,9 +1,9 @@
-# noise-secret-stream
+# @hyperswarm/secret-stream
 
 Secret stream backed by Noise and libsodium's secretstream
 
 ```
-npm install noise-secret-stream
+npm install @hyperswarm/secret-stream
 ```
 
 ## Usage
@@ -11,10 +11,10 @@ npm install noise-secret-stream
 You can either make a secret stream from an existing transport stream.
 
 ``` js
-const NoiseSecretStream = require('noise-secret-stream')
+const SecretStream = require('@hyperswarm/secret-stream')
 
-const a = new NoiseSecretStream(true, tcpClientStream)
-const b = new NoiseSecretStream(false, tcpServerStream)
+const a = new SecretStream(true, tcpClientStream)
+const b = new SecretStream(false, tcpServerStream)
 
 // pipe the underlying rawstreams together
 
@@ -28,8 +28,8 @@ b.on('data', function (data) {
 Or by making your own pipeline
 
 ``` js
-const a = new NoiseSecretStream(true)
-const b = new NoiseSecretStream(false)
+const a = new SecretStream(true)
+const b = new SecretStream(false)
 
 // pipe the underlying rawstreams together
 a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
@@ -43,7 +43,7 @@ b.on('data', function (data) {
 
 ## API
 
-#### `const s = new NoiseSecretStream(isInitiator, [rawStream], [options])`
+#### `const s = new SecretStream(isInitiator, [rawStream], [options])`
 
 Make a new stream. `isInitiator` is a boolean indication whether you are the client or the server.
 `rawStream` can be set to an underlying transport stream you want to run the noise stream over.
@@ -65,17 +65,17 @@ Options include:
 }
 ```
 
-The NoiseSecretStream returned is a Duplex stream that you use as as normal stream, to write/read data from,
+The SecretStream returned is a Duplex stream that you use as as normal stream, to write/read data from,
 except it's payloads are encrypted using the libsodium secretstream.
 
 Note that this uses ed25519 for the handshakes per default.
 
 #### `s.start(rawStream, [options])`
 
-Start a NoiseSecretStream from a rawStream asynchrously.
+Start a SecretStream from a rawStream asynchrously.
 
 ``` js
-const s = new NoiseSecretStream({
+const s = new SecretStream({
   autoStart: false // call start manually
 })
 
@@ -86,7 +86,7 @@ s.start(rawStream, {
 })
 ```
 
-#### `keyPair = NoiseSecretStream.keyPair([seed])`
+#### `keyPair = SecretStream.keyPair([seed])`
 
 Generate a ed25519 key pair.
 

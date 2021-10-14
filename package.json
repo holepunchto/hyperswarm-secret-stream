@@ -1,5 +1,5 @@
 {
-  "name": "noise-secret-stream",
+  "name": "@hyperswarm/secret-stream",
   "version": "4.2.0",
   "description": "Secret stream backed by Noise and libsodium's secretstream",
   "main": "index.js",
@@ -19,12 +19,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mafintosh/noise-secret-stream.git"
+    "url": "https://github.com/hyperswarm/secret-stream.git"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mafintosh/noise-secret-stream/issues"
+    "url": "https://github.com/hyperswarm/secret-stream/issues"
   },
-  "homepage": "https://github.com/mafintosh/noise-secret-stream"
+  "homepage": "https://github.com/hyperswarm/secret-stream"
 }

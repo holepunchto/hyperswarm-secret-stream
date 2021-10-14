@@ -5,12 +5,16 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-const NS = Buffer.alloc(64)
-const NS_INITIATOR = NS.subarray(0, 32)
-const NS_RESPONDER = NS.subarray(32, 64)
 
-sodium.crypto_generichash(NS_INITIATOR, Buffer.from('NoiseSecretStream_Initiator_XChaCha20Poly1305'))
-sodium.crypto_generichash(NS_RESPONDER, Buffer.from('NoiseSecretStream_Responder_XChaCha20Poly1305'))
+const slab = Buffer.alloc(92)
+
+const NS = slab.subarray(0, 32)
+const NS_INITIATOR = slab.subarray(32, 64)
+const NS_RESPONDER = slab.subarray(64, 96)
+
+sodium.crypto_generichash(NS, Buffer.from('hyperswarm/secret-stream'))
+sodium.crypto_generichash(NS_INITIATOR, Buffer.from([0]), NS)
+sodium.crypto_generichash(NS_RESPONDER, Buffer.from([1]), NS)
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
