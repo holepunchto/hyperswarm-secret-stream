@@ -1,20 +1,21 @@
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
 const sodium = require('sodium-universal')
 const { Duplex } = require('streamx')
+const b4a = require('b4a')
 const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
 
-const slab = Buffer.alloc(92)
+const slab = b4a.alloc(92)
 
 const NS = slab.subarray(0, 32)
 const NS_INITIATOR = slab.subarray(32, 64)
 const NS_RESPONDER = slab.subarray(64, 96)
 
-sodium.crypto_generichash(NS, Buffer.from('hyperswarm/secret-stream'))
-sodium.crypto_generichash(NS_INITIATOR, Buffer.from([0]), NS)
-sodium.crypto_generichash(NS_RESPONDER, Buffer.from([1]), NS)
+sodium.crypto_generichash(NS, b4a.from('hyperswarm/secret-stream'))
+sodium.crypto_generichash(NS_INITIATOR, b4a.from([0]), NS)
+sodium.crypto_generichash(NS_RESPONDER, b4a.from([1]), NS)
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
@@ -151,7 +152,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           const unprocessed = data.length - offset
 
           if (this._message === null) {
-            this._message = Buffer.allocUnsafe(this._len)
+            this._message = b4a.allocUnsafe(this._len)
           }
 
           data.copy(this._message, this._tmp, offset)
@@ -259,7 +260,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _setupSecretStream (tx, rx, handshakeHash, publicKey, remotePublicKey) {
-    const buf = Buffer.allocUnsafe(3 + IDHEADERBYTES)
+    const buf = b4a.allocUnsafe(3 + IDHEADERBYTES)
     writeUint24le(IDHEADERBYTES, buf)
 
     this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3 + 32))
@@ -327,8 +328,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     let wrapped = this._outgoingWrapped
 
     if (data !== this._outgoingPlain) {
-      if (typeof data === 'string') data = Buffer.from(data)
-      wrapped = Buffer.allocUnsafe(data.byteLength + 3 + ABYTES)
+      if (typeof data === 'string') data = b4a.from(data)
+      wrapped = b4a.allocUnsafe(data.byteLength + 3 + ABYTES)
       wrapped.set(data, 4)
     } else {
       this._outgoingWrapped = this._outgoingPlain = null
@@ -366,7 +367,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   alloc (len) {
-    const buf = Buffer.allocUnsafe(len + 3 + ABYTES)
+    const buf = b4a.allocUnsafe(len + 3 + ABYTES)
     this._outgoingWrapped = buf
     this._outgoingPlain = buf.subarray(4, buf.byteLength - ABYTES + 1)
     return this._outgoingPlain
@@ -379,7 +380,7 @@ function writeUint24le (n, buf) {
   buf[2] = (n >>> 16) & 255
 }
 
-function streamId (handshakeHash, isInitiator, out = Buffer.allocUnsafe(32)) {
+function streamId (handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
   sodium.crypto_generichash(out, handshakeHash, isInitiator ? NS_INITIATOR : NS_RESPONDER)
   return out
 }
