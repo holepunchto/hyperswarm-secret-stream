@@ -356,6 +356,7 @@ module.exports = class NoiseSecretStream extends Duplex {
       const opened = this._openedDone
       this._openedDone = null
       opened(val)
+      if (val) this.emit('connect')
     }
   }
 

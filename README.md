@@ -104,6 +104,12 @@ Populated after `open` is emitted.
 Get the unique hash of this handshake.
 Populated after `open` is emitted.
 
+#### `s.on('connect', onconnect)`
+
+Emitted when the handshake is fully done.
+It is safe to write to the stream immediately though, as data is buffered
+internally before the handshake has been completed.
+
 ## License
 
 MIT
