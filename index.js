@@ -155,7 +155,7 @@ module.exports = class NoiseSecretStream extends Duplex {
             this._message = b4a.allocUnsafe(this._len)
           }
 
-          data.copy(this._message, this._tmp, offset)
+          b4a.copy(data, this._message, this._tmp, offset)
           this._tmp += unprocessed
 
           if (end <= data.length) {
