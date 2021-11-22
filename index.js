@@ -208,7 +208,7 @@ module.exports = class NoiseSecretStream extends Duplex {
         const expectedId = streamId(this.handshakeHash, !this.isInitiator)
         const header = message.subarray(32)
 
-        if (!expectedId.equals(remoteId)) {
+        if (!b4a.equals(expectedId, remoteId)) {
           this.destroy(new Error('Invalid header received'))
           return
         }
