@@ -7,7 +7,7 @@ const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
 
-const slab = b4a.alloc(92)
+const slab = b4a.alloc(96)
 
 const NS = slab.subarray(0, 32)
 const NS_INITIATOR = slab.subarray(32, 64)
