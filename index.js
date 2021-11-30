@@ -90,15 +90,39 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.rawStream.on('close', this.destroy.bind(this, null))
 
     this._startHandshake(opts.handshake, opts.keyPair || null)
+    this._continueOpen(null)
 
-    if (this._startDone !== null) {
-      const done = this._startDone
-      this._startDone = null
-      this._open(done)
-    }
-
+    if (this.destroying) return
     if (opts.data) this._onrawdata(opts.data)
     if (opts.ended) this._onrawend()
+  }
+
+  _continueOpen (err) {
+    if (err) this.destroy(err)
+    if (this._startDone === null) return
+    const done = this._startDone
+    this._startDone = null
+    this._open(done)
+  }
+
+  _onkeypairpromise (p) {
+    const self = this
+    const cont = this._continueOpen.bind(this)
+
+    p.then(onkeypair, cont)
+
+    function onkeypair (kp) {
+      self._onkeypair(kp)
+      cont(null)
+    }
+  }
+
+  _onkeypair (keyPair) {
+    const pattern = this._handshakePattern || 'XX'
+    const remotePublicKey = this.remotePublicKey
+
+    this._handshake = new Handshake(this.isInitiator, keyPair, remotePublicKey, pattern)
+    this.publicKey = this._handshake.keyPair.publicKey
   }
 
   _startHandshake (handshake, keyPair) {
@@ -109,11 +133,12 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
 
     if (!keyPair) keyPair = Handshake.keyPair()
-    const pattern = this._handshakePattern || 'XX'
-    const remotePublicKey = this.remotePublicKey
 
-    this._handshake = new Handshake(this.isInitiator, keyPair, remotePublicKey, pattern)
-    this.publicKey = this._handshake.keyPair.publicKey
+    if (typeof keyPair.then === 'function') {
+      this._onkeypairpromise(keyPair)
+    } else {
+      this._onkeypair(keyPair)
+    }
   }
 
   _onrawdata (data) {
@@ -283,7 +308,8 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _open (cb) {
-    if (this._rawStream === null) { // no autostart
+    // no autostart or no handshake yet
+    if (this._rawStream === null || (this._handshake === null && this._encrypt === null)) {
       this._startDone = cb
       return
     }

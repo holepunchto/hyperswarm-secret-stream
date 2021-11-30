@@ -70,6 +70,10 @@ except it's payloads are encrypted using the libsodium secretstream.
 
 Note that this uses ed25519 for the handshakes per default.
 
+If need to load the key pair asynchronously, then secret-stream also supports passing in a promise
+instead of the keypair that later resolves to `{ publicKey, secretKey }`. The stream lifecycle will wait
+for the resolution and auto destroy the stream if the promise errors.
+
 #### `s.start(rawStream, [options])`
 
 Start a SecretStream from a rawStream asynchrously.

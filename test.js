@@ -343,6 +343,62 @@ tape('can destroy in the first tick', function (t) {
   stream.emit('error', new Error('stop'))
 })
 
+tape('keypair can be a promise', function (t) {
+  t.plan(2)
+
+  const kp = NoiseStream.keyPair()
+
+  const a = new NoiseStream(true, null, {
+    keyPair: new Promise((resolve) => {
+      setImmediate(() => resolve(kp))
+    })
+  })
+
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.on('connect', function () {
+    t.same(kp.publicKey, a.publicKey)
+  })
+
+  b.on('connect', function () {
+    t.same(kp.publicKey, b.remotePublicKey)
+  })
+})
+
+tape('keypair can be a promise that rejects', function (t) {
+  t.plan(4)
+
+  const kp = NoiseStream.keyPair()
+
+  const a = new NoiseStream(true, null, {
+    keyPair: new Promise((resolve, reject) => {
+      reject(new Error('stop'))
+    })
+  })
+
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.rawStream.on('error', function (err) {
+    t.same(err, new Error('stop'))
+  })
+
+  a.on('error', function (err) {
+    t.same(err, new Error('stop'))
+  })
+
+  b.rawStream.on('error', function (err) {
+    t.same(err, new Error('stop'))
+  })
+
+  b.on('error', function (err) {
+    t.same(err, new Error('stop'))
+  })
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
