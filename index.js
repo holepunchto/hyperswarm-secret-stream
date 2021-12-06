@@ -21,6 +21,10 @@ module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
     super()
 
+    if (typeof isInitiator !== 'boolean') {
+      throw new Error('isInitiator should be a boolean')
+    }
+
     this.noiseStream = this
     this.isInitiator = isInitiator
     this.rawStream = null

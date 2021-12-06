@@ -370,8 +370,6 @@ tape('keypair can be a promise', function (t) {
 tape('keypair can be a promise that rejects', function (t) {
   t.plan(4)
 
-  const kp = NoiseStream.keyPair()
-
   const a = new NoiseStream(true, null, {
     keyPair: new Promise((resolve, reject) => {
       reject(new Error('stop'))
