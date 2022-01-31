@@ -60,7 +60,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._outgoingWrapped = null
     this._utp = null
     this._setup = true
-    this._ended = false
+    this._ended = 2
     this._encrypt = null
     this._decrypt = null
 
@@ -151,7 +151,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _onrawclose () {
-    if (!this._ended) this.destroy()
+    if (this._ended !== 0) this.destroy()
   }
 
   _onrawdata (data) {
@@ -210,6 +210,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _onrawend () {
+    this._ended--
     this.push(null)
   }
 
@@ -386,7 +387,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _final (cb) {
-    this._ended = true
+    this._ended--
     this._rawStream.end()
     cb(null)
   }
