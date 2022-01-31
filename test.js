@@ -397,6 +397,21 @@ tape('keypair can be a promise that rejects', function (t) {
   })
 })
 
+tape('drains data after both streams end', function (t) {
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  b.end()
+  a.end(Buffer.from('hello world'))
+
+  b.once('data', function (data) {
+    t.same(data, Buffer.from('hello world'))
+    t.end()
+  })
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
