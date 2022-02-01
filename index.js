@@ -343,6 +343,11 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _predestroy () {
+    if (this.rawStream) {
+      const error = this._readableState.error || this._writableState.error
+      this.rawStream.destroy(error)
+    }
+
     if (this._startDone !== null) {
       const done = this._startDone
       this._startDone = null
@@ -352,14 +357,12 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this._handshakeDone !== null) {
       const done = this._handshakeDone
       this._handshakeDone = null
-      if (this.rawStream) this.rawStream.destroy()
       done(new Error('Stream destroyed'))
     }
 
     if (this._drainDone !== null) {
       const done = this._drainDone
       this._drainDone = null
-      if (this.rawStream) this.rawStream.destroy()
       done(new Error('Stream destroyed'))
     }
   }
@@ -403,8 +406,6 @@ module.exports = class NoiseSecretStream extends Duplex {
 
   _destroy (cb) {
     this._resolveOpened(false)
-    const error = this._readableState.error || this._writableState.error
-    if (this.rawStream) this.rawStream.destroy(error)
     cb(null)
   }
 
