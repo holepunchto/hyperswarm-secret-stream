@@ -343,24 +343,26 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _predestroy () {
+    if (this.rawStream) {
+      const error = this._readableState.error || this._writableState.error
+      this.rawStream.destroy(error)
+    }
+
     if (this._startDone !== null) {
       const done = this._startDone
       this._startDone = null
-      if (this.rawStream) this.rawStream.destroy()
       done(new Error('Stream destroyed'))
     }
 
     if (this._handshakeDone !== null) {
       const done = this._handshakeDone
       this._handshakeDone = null
-      if (this.rawStream) this.rawStream.destroy()
       done(new Error('Stream destroyed'))
     }
 
     if (this._drainDone !== null) {
       const done = this._drainDone
       this._drainDone = null
-      if (this.rawStream) this.rawStream.destroy()
       done(new Error('Stream destroyed'))
     }
   }
