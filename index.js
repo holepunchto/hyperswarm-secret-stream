@@ -19,7 +19,7 @@ sodium.crypto_generichash(NS_RESPONDER, b4a.from([1]), NS)
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
-    super({ map: toBuffer })
+    super({ mapWritable: toBuffer })
 
     if (typeof isInitiator !== 'boolean') {
       throw new Error('isInitiator should be a boolean')
