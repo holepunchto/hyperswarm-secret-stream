@@ -19,7 +19,7 @@ sodium.crypto_generichash(NS_RESPONDER, b4a.from([1]), NS)
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
-    super()
+    super({ mapWritable: toBuffer })
 
     if (typeof isInitiator !== 'boolean') {
       throw new Error('isInitiator should be a boolean')
@@ -371,7 +371,6 @@ module.exports = class NoiseSecretStream extends Duplex {
     let wrapped = this._outgoingWrapped
 
     if (data !== this._outgoingPlain) {
-      if (typeof data === 'string') data = b4a.from(data)
       wrapped = b4a.allocUnsafe(data.byteLength + 3 + ABYTES)
       wrapped.set(data, 4)
     } else {
@@ -426,4 +425,8 @@ function writeUint24le (n, buf) {
 function streamId (handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
   sodium.crypto_generichash(out, handshakeHash, isInitiator ? NS_INITIATOR : NS_RESPONDER)
   return out
+}
+
+function toBuffer (data) {
+  return typeof data === 'string' ? b4a.from(data) : data
 }
