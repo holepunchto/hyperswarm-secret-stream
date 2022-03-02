@@ -2,6 +2,7 @@ const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstre
 const sodium = require('sodium-universal')
 const { Duplex } = require('streamx')
 const b4a = require('b4a')
+const Timeout = require('timeout-refresh')
 const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
@@ -63,6 +64,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._ended = 2
     this._encrypt = null
     this._decrypt = null
+    this._timeout = null
+    this._timeoutMs = 0
 
     if (opts.autoStart !== false) this.start(rawStream, opts)
 
@@ -77,6 +80,14 @@ module.exports = class NoiseSecretStream extends Duplex {
 
   static id (handshakeHash, isInitiator, id) {
     return streamId(handshakeHash, isInitiator, id)
+  }
+
+  setTimeout (ms) {
+    this._clearTimeout()
+    this._timeoutMs = ms || 0
+
+    if (!ms || this.rawStream === null) return
+    this._timeout = new Timeout(ms, destroyTimeout, this)
   }
 
   start (rawStream, opts = {}) {
@@ -98,8 +109,13 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._continueOpen(null)
 
     if (this.destroying) return
+
     if (opts.data) this._onrawdata(opts.data)
     if (opts.ended) this._onrawend()
+
+    if (this._timeoutMs > 0 && this._timeout === null) {
+      this.setTimeout(this._timeoutMs)
+    }
   }
 
   _continueOpen (err) {
@@ -156,6 +172,10 @@ module.exports = class NoiseSecretStream extends Duplex {
 
   _onrawdata (data) {
     let offset = 0
+
+    if (this._timeout !== null) {
+      this._timeout.refresh()
+    }
 
     do {
       switch (this._state) {
@@ -403,7 +423,14 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
   }
 
+  _clearTimeout () {
+    if (this._timeout === null) return
+    this._timeout.destroy()
+    this._timeout = null
+  }
+
   _destroy (cb) {
+    this._clearTimeout()
     this._resolveOpened(false)
     cb(null)
   }
@@ -429,4 +456,8 @@ function streamId (handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
 
 function toBuffer (data) {
   return typeof data === 'string' ? b4a.from(data) : data
+}
+
+function destroyTimeout () {
+  this.destroy(new Error('Stream timed out'))
 }

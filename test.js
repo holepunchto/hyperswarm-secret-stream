@@ -412,6 +412,32 @@ tape('drains data after both streams end', function (t) {
   })
 })
 
+tape('can timeout', function (t) {
+  t.plan(1)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  let i = 0
+
+  a.setTimeout(200)
+  a.resume()
+  a.on('error', function () {
+    clearTimeout(interval)
+    t.ok(i >= 10)
+  })
+
+  b.on('error', () => {})
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  const interval = setInterval(tick, 50)
+
+  function tick () {
+    i++
+    if (i < 10) b.write('hi')
+  }
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
