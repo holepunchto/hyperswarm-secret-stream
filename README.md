@@ -90,6 +90,11 @@ s.start(rawStream, {
 })
 ```
 
+#### `s.setTimeout(ms)`
+
+Set the stream timeout (defaults to Infinity). If no data is received within a `ms` window,
+the stream is auto destroyed.
+
 #### `keyPair = SecretStream.keyPair([seed])`
 
 Generate a ed25519 key pair.
