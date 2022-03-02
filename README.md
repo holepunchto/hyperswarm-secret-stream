@@ -98,7 +98,6 @@ the stream is auto destroyed.
 #### `s.setKeepAlive(ms)`
 
 Send a heartbeat (empty message) every time the socket is idle for `ms` milliseconds.
-If not timeout is set, this also sets the timeout to `2 * ms`, meaning each message has `ms` milliseconds to arrive.
 
 #### `keyPair = SecretStream.keyPair([seed])`
 
