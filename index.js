@@ -66,6 +66,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._decrypt = null
     this._timeout = null
     this._timeoutMs = 0
+    this._keepAlive = null
+    this._keepAliveMs = 0
 
     if (opts.autoStart !== false) this.start(rawStream, opts)
 
@@ -83,11 +85,26 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   setTimeout (ms) {
+    if (!ms) ms = 0
+
     this._clearTimeout()
-    this._timeoutMs = ms || 0
+    this._timeoutMs = ms
 
     if (!ms || this.rawStream === null) return
-    this._timeout = new Timeout(ms, destroyTimeout, this)
+
+    this._timeout = Timeout.once(ms, destroyTimeout, this)
+    this._timeout.unref()
+  }
+
+  setKeepAlive (ms) {
+    if (!ms) ms = 0
+
+    this._keepAliveMs = ms
+
+    if (!ms || this.rawStream === null) return
+
+    this._keepAlive = Timeout.on(ms, sendKeepAlive, this)
+    this._keepAlive.unref()
   }
 
   start (rawStream, opts = {}) {
@@ -112,6 +129,10 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     if (opts.data) this._onrawdata(opts.data)
     if (opts.ended) this._onrawend()
+
+    if (this._keepAliveMs > 0 && this._keepAlive === null) {
+      this.setKeepAlive(this._keepAliveMs)
+    }
 
     if (this._timeoutMs > 0 && this._timeout === null) {
       this.setTimeout(this._timeoutMs)
@@ -292,6 +313,9 @@ module.exports = class NoiseSecretStream extends Duplex {
       return
     }
 
+    // If keep alive is selective, eat the empty buffers (ie assume the other side has it enabled also)
+    if (plain.byteLength === 0 && this._keepAliveMs !== 0) return
+
     if (this.push(plain) === false) {
       this.rawStream.pause()
     }
@@ -401,6 +425,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     // offset 4 so we can do it in-place
     this._encrypt.next(wrapped.subarray(4, 4 + data.byteLength), wrapped.subarray(3))
 
+    if (this._keepAlive !== null) this._keepAlive.refresh()
+
     if (this._rawStream.write(wrapped) === false) {
       this._drainDone = cb
     } else {
@@ -409,6 +435,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _final (cb) {
+    this._clearKeepAlive()
     this._ended--
     this._rawStream.end()
     cb(null)
@@ -427,9 +454,18 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this._timeout === null) return
     this._timeout.destroy()
     this._timeout = null
+    this._timeoutMs = 0
+  }
+
+  _clearKeepAlive () {
+    if (this._keepAlive === null) return
+    this._keepAlive.destroy()
+    this._keepAlive = null
+    this._keepAliveMs = 0
   }
 
   _destroy (cb) {
+    this._clearKeepAlive()
     this._clearTimeout()
     this._resolveOpened(false)
     cb(null)
@@ -460,4 +496,9 @@ function toBuffer (data) {
 
 function destroyTimeout () {
   this.destroy(new Error('Stream timed out'))
+}
+
+function sendKeepAlive () {
+  const empty = this.alloc(0)
+  this.write(empty)
 }

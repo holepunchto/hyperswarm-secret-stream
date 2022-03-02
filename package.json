@@ -10,7 +10,7 @@
     "sodium-secretstream": "^1.0.0",
     "sodium-universal": "^3.0.4",
     "streamx": "^2.10.2",
-    "timeout-refresh": "^1.0.3"
+    "timeout-refresh": "^2.0.0"
   },
   "devDependencies": {
     "standard": "^16.0.3",

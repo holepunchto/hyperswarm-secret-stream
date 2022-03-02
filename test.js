@@ -438,6 +438,40 @@ tape('can timeout', function (t) {
   }
 })
 
+tape('keep alive', function (t) {
+  t.plan(1)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  let i = 0
+
+  a.setKeepAlive(500)
+  b.setKeepAlive(500)
+
+  a.resume()
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+  b.rawStream.on('data', function (data) {
+    if (data.byteLength === 20) { // empty message
+      clearInterval(interval)
+      t.ok(i > 10, 'keep alive when idle')
+      t.end()
+      a.end()
+      b.end()
+    }
+  })
+
+  const interval = setInterval(tick, 100)
+
+  function tick () {
+    i++
+    if (i < 10) {
+      b.write('hi')
+    }
+  }
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
