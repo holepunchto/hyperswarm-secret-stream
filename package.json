@@ -9,7 +9,7 @@
     "noise-handshake": "^2.1.0",
     "sodium-secretstream": "^1.0.0",
     "sodium-universal": "^3.0.4",
-    "streamx": "^2.10.2",
+    "streamx": "^2.12.4",
     "timeout-refresh": "^2.0.0"
   },
   "devDependencies": {
