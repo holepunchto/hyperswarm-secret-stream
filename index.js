@@ -1,5 +1,6 @@
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
 const sodium = require('sodium-universal')
+const crypto = require('hypercore-crypto')
 const { Duplex } = require('streamx')
 const b4a = require('b4a')
 const Timeout = require('timeout-refresh')
@@ -7,16 +8,7 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-
-const slab = b4a.alloc(96)
-
-const NS = slab.subarray(0, 32)
-const NS_INITIATOR = slab.subarray(32, 64)
-const NS_RESPONDER = slab.subarray(64, 96)
-
-sodium.crypto_generichash(NS, b4a.from('hyperswarm/secret-stream'))
-sodium.crypto_generichash(NS_INITIATOR, b4a.from([0]), NS)
-sodium.crypto_generichash(NS_RESPONDER, b4a.from([1]), NS)
+const [NS_INITIATOR, NS_RESPONDER] = crypto.namespace('hyperswarm/secret-stream', 2)
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
@@ -486,7 +478,7 @@ function writeUint24le (n, buf) {
 }
 
 function streamId (handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
-  sodium.crypto_generichash(out, handshakeHash, isInitiator ? NS_INITIATOR : NS_RESPONDER)
+  sodium.crypto_generichash(out, isInitiator ? NS_INITIATOR : NS_RESPONDER, handshakeHash)
   return out
 }
 
