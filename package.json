@@ -6,8 +6,8 @@
   "dependencies": {
     "b4a": "^1.1.0",
     "hypercore-crypto": "^3.3.0",
-    "noise-curve-ed": "^1.0.2",
-    "noise-handshake": "^2.1.0",
+    "noise-curve-ed": "^2.0.0",
+    "noise-handshake": "^3.0.0",
     "sodium-secretstream": "^1.0.0",
     "sodium-universal": "^3.0.4",
     "streamx": "^2.10.2",
