@@ -58,7 +58,7 @@ Options include:
   handshake: { // if you want to use an handshake performed elsewhere pass it here
     tx,
     rx,
-    handshakeHash,
+    hash,
     publicKey,
     remotePublicKey
   }
