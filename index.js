@@ -1,7 +1,7 @@
 const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
 const sodium = require('sodium-universal')
 const crypto = require('hypercore-crypto')
-const { Duplex } = require('streamx')
+const { Duplex, getStreamError } = require('streamx')
 const b4a = require('b4a')
 const Timeout = require('timeout-refresh')
 const Bridge = require('./lib/bridge')
@@ -380,7 +380,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
   _predestroy () {
     if (this.rawStream) {
-      const error = this._readableState.error || this._writableState.error
+      const error = getStreamError(this)
       this.rawStream.destroy(error)
     }
 
