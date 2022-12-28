@@ -22,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/hyperswarm/secret-stream.git"
+    "url": "https://github.com/holepunchto/hyperswarm-secret-stream.git"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/hyperswarm/secret-stream/issues"
+    "url": "https://github.com/holepunchto/hyperswarm-secret-stream/issues"
   },
-  "homepage": "https://github.com/hyperswarm/secret-stream"
+  "homepage": "https://github.com/holepunchto/hyperswarm-secret-stream"
 }
