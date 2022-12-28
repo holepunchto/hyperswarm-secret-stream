@@ -99,10 +99,6 @@ the stream is auto destroyed.
 
 Send a heartbeat (empty message) every time the socket is idle for `ms` milliseconds.
 
-#### `keyPair = SecretStream.keyPair([seed])`
-
-Generate a ed25519 key pair.
-
 #### `s.publicKey`
 
 Get the local public key.
@@ -122,6 +118,10 @@ Populated after `open` is emitted.
 Emitted when the handshake is fully done.
 It is safe to write to the stream immediately though, as data is buffered
 internally before the handshake has been completed.
+
+#### `keyPair = SecretStream.keyPair([seed])`
+
+Generate a ed25519 key pair.
 
 ## License
 
