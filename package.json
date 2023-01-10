@@ -9,7 +9,7 @@
     "noise-curve-ed": "^2.0.0",
     "noise-handshake": "^3.0.0",
     "sodium-secretstream": "^1.0.0",
-    "sodium-universal": "^3.0.4",
+    "sodium-universal": "^4.0.0",
     "streamx": "^2.13.0",
     "timeout-refresh": "^2.0.0"
   },
