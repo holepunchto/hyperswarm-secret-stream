@@ -127,4 +127,4 @@ Generate a ed25519 key pair.
 
 ## License
 
-MIT
+Apache-2.0
