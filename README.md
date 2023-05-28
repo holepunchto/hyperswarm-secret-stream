@@ -99,7 +99,7 @@ the stream is auto destroyed.
 
 #### `s.setKeepAlive(ms)`
 
-Send a heartbeat (empty message) every time the socket is idle for `ms` milliseconds. **Note:** If one side calls `s.setKeepAlive()` and the other does not, then the empty messages will be passed through to the piped stream. These empty messages will cause a stream like [protomux](https://github.com/mafintosh/protomux) to crash.
+Send a heartbeat (empty message) every time the socket is idle for `ms` milliseconds. **Note:** If one side calls `s.setKeepAlive()` and the other does not, then the empty messages will be passed through to the piped stream.
 
 #### `s.publicKey`
 
