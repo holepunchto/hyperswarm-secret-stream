@@ -472,6 +472,22 @@ tape('keep alive', function (t) {
   }
 })
 
+tape('end before piped', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true)
+
+  a.on('finish', function () {
+    t.pass("'finish' event fired")
+  })
+
+  a.on('close', function () {
+    t.pass("'close' event fired")
+  })
+
+  a.end()
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
