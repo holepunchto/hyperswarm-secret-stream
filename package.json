@@ -14,11 +14,11 @@
     "timeout-refresh": "^2.0.0"
   },
   "devDependencies": {
-    "standard": "^16.0.3",
-    "tape": "^5.2.2"
+    "brittle": "^3.3.0",
+    "standard": "^17.1.0"
   },
   "scripts": {
-    "test": "standard && tape test.js"
+    "test": "standard && brittle test.js"
   },
   "repository": {
     "type": "git",

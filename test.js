@@ -1,11 +1,11 @@
-const tape = require('tape')
+const test = require('brittle')
 const net = require('net')
 const Events = require('events')
 const crypto = require('crypto')
 const { Readable, Duplex } = require('streamx')
 const NoiseStream = require('./')
 
-tape('basic', function (t) {
+test('basic', function (t) {
   t.plan(2)
 
   const a = new NoiseStream(true)
@@ -14,15 +14,15 @@ tape('basic', function (t) {
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
   a.on('open', function () {
-    t.same(a.remotePublicKey, b.publicKey)
+    t.alike(a.remotePublicKey, b.publicKey)
   })
 
   b.on('open', function () {
-    t.same(a.publicKey, b.remotePublicKey)
+    t.alike(a.publicKey, b.remotePublicKey)
   })
 })
 
-tape('data looks encrypted', function (t) {
+test('data looks encrypted', function (t) {
   t.plan(2)
 
   const a = new NoiseStream(true)
@@ -39,19 +39,20 @@ tape('data looks encrypted', function (t) {
   })
 
   b.on('data', function (data) {
-    t.same(data, Buffer.from('plaintext'))
+    t.alike(data, Buffer.from('plaintext'))
     t.ok(Buffer.concat(buf).indexOf(Buffer.from('plaintext')) === -1)
-    t.end()
   })
 })
 
-tape('works with external streams', function (t) {
+test('works with external streams', function (t) {
+  t.plan(2)
+
   const server = net.createServer(function (socket) {
     const s = new NoiseStream(false, socket)
 
     s.on('data', function (data) {
       s.destroy()
-      t.same(data, Buffer.from('encrypted!'))
+      t.alike(data, Buffer.from('encrypted!'))
     })
   })
 
@@ -66,11 +67,13 @@ tape('works with external streams', function (t) {
   })
 
   server.on('close', function () {
-    t.end()
+    t.pass()
   })
 })
 
-tape('works with tiny chunks', function (t) {
+test('works with tiny chunks', function (t) {
+  t.plan(2)
+
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
 
@@ -92,21 +95,22 @@ tape('works with tiny chunks', function (t) {
   })
 
   b.once('data', function (data) {
-    t.same(data, Buffer.from('hello world'))
+    t.alike(data, Buffer.from('hello world'))
     b.once('data', function (data) {
-      t.same(data, tmp)
-      t.end()
+      t.alike(data, tmp)
     })
   })
 })
 
-tape('async creation', function (t) {
+test('async creation', function (t) {
+  t.plan(3)
+
   const server = net.createServer(function (socket) {
     const s = new NoiseStream(false, socket)
 
     s.on('data', function (data) {
       s.destroy()
-      t.same(data, Buffer.from('encrypted!'))
+      t.alike(data, Buffer.from('encrypted!'))
     })
   })
 
@@ -115,7 +119,7 @@ tape('async creation', function (t) {
       autoStart: false
     })
 
-    t.notOk(s.rawStream, 'not started')
+    t.absent(s.rawStream, 'not started')
 
     const socket = net.connect(server.address().port)
     socket.on('connect', function () {
@@ -129,11 +133,13 @@ tape('async creation', function (t) {
   })
 
   server.on('close', function () {
-    t.end()
+    t.pass()
   })
 })
 
-tape('send and recv lots of data', function (t) {
+test('send and recv lots of data', function (t) {
+  t.plan(3)
+
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
 
@@ -162,14 +168,13 @@ tape('send and recv lots of data', function (t) {
     recv += data.byteLength
   })
   b.on('end', function () {
-    t.same(recv, 1024 * 1024 * 1024)
+    t.is(recv, 1024 * 1024 * 1024)
     t.ok(same, 'data was the same')
     t.pass('1gb transfer took ' + (Date.now() - then) + 'ms')
-    t.end()
   })
 })
 
-tape('send garbage handshake data', function (t) {
+test('send garbage handshake data', function (t) {
   t.plan(2)
 
   check(Buffer.alloc(65536))
@@ -186,7 +191,9 @@ tape('send garbage handshake data', function (t) {
   }
 })
 
-tape('send garbage secretstream header data', function (t) {
+test('send garbage secretstream header data', function (t) {
+  t.plan(2)
+
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
 
@@ -196,7 +203,6 @@ tape('send garbage secretstream header data', function (t) {
 
   a.on('error', function () {
     t.pass('header errored')
-    t.end()
   })
 
   a.on('open', function () {
@@ -206,7 +212,9 @@ tape('send garbage secretstream header data', function (t) {
   })
 })
 
-tape('send garbage secretstream payload data', function (t) {
+test('send garbage secretstream payload data', function (t) {
+  t.plan(2)
+
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
 
@@ -221,7 +229,6 @@ tape('send garbage secretstream payload data', function (t) {
 
   a.on('error', function () {
     t.pass('payload errored')
-    t.end()
   })
 
   a.once('data', function () {
@@ -231,7 +238,9 @@ tape('send garbage secretstream payload data', function (t) {
   })
 })
 
-tape('handshake outside', async function (t) {
+test('handshake outside', async function (t) {
+  t.plan(1)
+
   const hs = await createHandshake()
 
   const a = new NoiseStream(true, null, {
@@ -247,11 +256,12 @@ tape('handshake outside', async function (t) {
   a.write('test')
 
   const [data] = await Events.once(b, 'data')
-  t.same(data, Buffer.from('test'))
-  t.end()
+  t.alike(data, Buffer.from('test'))
 })
 
-tape('pass in head buffer', async function (t) {
+test('pass in head buffer', async function (t) {
+  t.plan(3)
+
   const hs = await createHandshake()
 
   const a = new NoiseStream(true, null, {
@@ -271,7 +281,7 @@ tape('pass in head buffer', async function (t) {
   const promise = new Promise((resolve) => { done = resolve })
 
   b.on('data', function (data) {
-    t.same(data, expected.shift())
+    t.alike(data, expected.shift())
     if (expected.length === 0) done()
   })
 
@@ -294,7 +304,7 @@ tape('pass in head buffer', async function (t) {
   return promise
 })
 
-tape('errors are forwarded', async function (t) {
+test('errors are forwarded', async function (t) {
   t.plan(4)
 
   let same
@@ -303,7 +313,7 @@ tape('errors are forwarded', async function (t) {
     let plan = 4
 
     same = (a, b, m) => {
-      t.same(a, b, m)
+      t.alike(a, b, m)
       if (--plan <= 0) resolve()
     }
   })
@@ -329,21 +339,21 @@ tape('errors are forwarded', async function (t) {
   return promise
 })
 
-tape('can destroy in the first tick', function (t) {
+test('can destroy in the first tick', function (t) {
   t.plan(1)
 
   const stream = new Duplex()
   const a = new NoiseStream(true, stream)
 
   a.on('error', function (err) {
-    t.same(err, new Error('stop'))
+    t.alike(err, new Error('stop'))
   })
 
   // hackish destroy to force it in the first tick
   stream.emit('error', new Error('stop'))
 })
 
-tape('keypair can be a promise', function (t) {
+test('keypair can be a promise', function (t) {
   t.plan(2)
 
   const kp = NoiseStream.keyPair()
@@ -359,15 +369,15 @@ tape('keypair can be a promise', function (t) {
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
   a.on('connect', function () {
-    t.same(kp.publicKey, a.publicKey)
+    t.alike(kp.publicKey, a.publicKey)
   })
 
   b.on('connect', function () {
-    t.same(kp.publicKey, b.remotePublicKey)
+    t.alike(kp.publicKey, b.remotePublicKey)
   })
 })
 
-tape('keypair can be a promise that rejects', function (t) {
+test('keypair can be a promise that rejects', function (t) {
   t.plan(4)
 
   const a = new NoiseStream(true, null, {
@@ -381,23 +391,25 @@ tape('keypair can be a promise that rejects', function (t) {
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
   a.rawStream.on('error', function (err) {
-    t.same(err, new Error('stop'))
+    t.alike(err, new Error('stop'))
   })
 
   a.on('error', function (err) {
-    t.same(err, new Error('stop'))
+    t.alike(err, new Error('stop'))
   })
 
   b.rawStream.on('error', function (err) {
-    t.same(err, new Error('stop'))
+    t.alike(err, new Error('stop'))
   })
 
   b.on('error', function (err) {
-    t.same(err, new Error('stop'))
+    t.alike(err, new Error('stop'))
   })
 })
 
-tape('drains data after both streams end', function (t) {
+test('drains data after both streams end', function (t) {
+  t.plan(1)
+
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
 
@@ -407,12 +419,11 @@ tape('drains data after both streams end', function (t) {
   a.end(Buffer.from('hello world'))
 
   b.once('data', function (data) {
-    t.same(data, Buffer.from('hello world'))
-    t.end()
+    t.alike(data, Buffer.from('hello world'))
   })
 })
 
-tape('can timeout', function (t) {
+test('can timeout', function (t) {
   t.plan(1)
 
   const a = new NoiseStream(true)
@@ -438,7 +449,7 @@ tape('can timeout', function (t) {
   }
 })
 
-tape('keep alive', function (t) {
+test('keep alive', function (t) {
   t.plan(1)
 
   const a = new NoiseStream(true)
@@ -456,7 +467,6 @@ tape('keep alive', function (t) {
     if (data.byteLength === 20) { // empty message
       clearInterval(interval)
       t.ok(i > 10, 'keep alive when idle')
-      t.end()
       a.end()
       b.end()
     }
