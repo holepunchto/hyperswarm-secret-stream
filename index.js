@@ -24,6 +24,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     this.publicKey = opts.publicKey || null
     this.remotePublicKey = opts.remotePublicKey || null
+    this.encrypted = opts.unsafeDisableEncryption !== true
     this.handshakeHash = null
 
     // pointer for upstream to set data here if they want
@@ -303,12 +304,14 @@ module.exports = class NoiseSecretStream extends Duplex {
       return
     }
 
-    if (message.length < ABYTES) {
+    const padding = this.encrypted ? ABYTES : 0
+
+    if (message.length < padding) {
       this.destroy(new Error('Invalid message received'))
       return
     }
 
-    const plain = message.subarray(1, message.byteLength - ABYTES + 1)
+    const plain = message.subarray(1, message.byteLength - padding + 1)
 
     try {
       this._decrypt.next(message, plain)
@@ -350,8 +353,13 @@ module.exports = class NoiseSecretStream extends Duplex {
     const buf = b4a.allocUnsafe(3 + IDHEADERBYTES)
     writeUint24le(IDHEADERBYTES, buf)
 
-    this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3 + 32))
-    this._decrypt = new Pull(rx.subarray(0, KEYBYTES))
+    if (this.encrypted) {
+      this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3 + 32))
+      this._decrypt = new Pull(rx.subarray(0, KEYBYTES))
+    } else {
+      this._encrypt = pushNoop
+      this._decrypt = pullNoop
+    }
 
     this.publicKey = publicKey
     this.remotePublicKey = remotePublicKey
@@ -419,7 +427,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     let wrapped = this._outgoingWrapped
 
     if (data !== this._outgoingPlain) {
-      wrapped = b4a.allocUnsafe(data.byteLength + 3 + ABYTES)
+      const padding = this.encrypted ? ABYTES : 1
+      wrapped = b4a.allocUnsafe(data.byteLength + 3 + padding)
       wrapped.set(data, 4)
     } else {
       this._outgoingWrapped = this._outgoingPlain = null
@@ -505,4 +514,13 @@ function destroyTimeout () {
 function sendKeepAlive () {
   const empty = this.alloc(0)
   this.write(empty)
+}
+
+const pushNoop = {
+  next () {}
+}
+
+const pullNoop = {
+  init () {},
+  next () {}
 }
