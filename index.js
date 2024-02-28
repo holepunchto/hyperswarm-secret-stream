@@ -9,6 +9,7 @@ const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
 const [NS_INITIATOR, NS_RESPONDER] = crypto.namespace('hyperswarm/secret-stream', 2)
+const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
@@ -423,6 +424,10 @@ module.exports = class NoiseSecretStream extends Duplex {
       wrapped.set(data, 4)
     } else {
       this._outgoingWrapped = this._outgoingPlain = null
+    }
+
+    if (wrapped.byteLength - 3 > MAX_ATOMIC_WRITE) {
+      return cb(new Error('Message is too large for an atomic write. Max size is ' + MAX_ATOMIC_WRITE + ' bytes.'))
     }
 
     writeUint24le(wrapped.byteLength - 3, wrapped)

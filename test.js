@@ -482,6 +482,20 @@ test('keep alive', function (t) {
   }
 })
 
+test('message is too large', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.on('error', () => t.pass('should error'))
+  b.on('error', () => t.pass('should error'))
+
+  a.write(Buffer.alloc(32 * 1024 * 1024))
+})
+
 function createHandshake () {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
