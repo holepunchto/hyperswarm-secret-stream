@@ -490,8 +490,8 @@ test('message is too large', function (t) {
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
-  a.on('error', error => t.pass('should error'))
-  b.on('error', error => t.pass('should error'))
+  a.on('error', () => t.pass('should error'))
+  b.on('error', () => t.pass('should error'))
 
   a.write(Buffer.alloc(32 * 1024 * 1024))
 })
