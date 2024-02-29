@@ -26,6 +26,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.publicKey = opts.publicKey || null
     this.remotePublicKey = opts.remotePublicKey || null
     this.handshakeHash = null
+    this.connected = false
 
     // pointer for upstream to set data here if they want
     this.userData = null
@@ -451,12 +452,13 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _resolveOpened (val) {
-    if (this._openedDone !== null) {
-      const opened = this._openedDone
-      this._openedDone = null
-      opened(val)
-      if (val) this.emit('connect')
-    }
+    if (this._openedDone === null) return
+    const opened = this._openedDone
+    this._openedDone = null
+    opened(val)
+    if (!val) return
+    this.connected = true
+    this.emit('connect')
   }
 
   _clearTimeout () {
@@ -485,6 +487,17 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._outgoingWrapped = buf
     this._outgoingPlain = buf.subarray(4, buf.byteLength - ABYTES + 1)
     return this._outgoingPlain
+  }
+
+  toJSON () {
+    return {
+      isInitiator: this.isInitiator,
+      publicKey: this.publicKey && b4a.toString(this.publicKey, 'hex'),
+      remotePublicKey: this.remotePublicKey && b4a.toString(this.remotePublicKey, 'hex'),
+      connected: this.connected,
+      destroying: this.destroying,
+      destroyed: this.destroyed
+    }
   }
 }
 
