@@ -496,7 +496,8 @@ module.exports = class NoiseSecretStream extends Duplex {
       remotePublicKey: this.remotePublicKey && b4a.toString(this.remotePublicKey, 'hex'),
       connected: this.connected,
       destroying: this.destroying,
-      destroyed: this.destroyed
+      destroyed: this.destroyed,
+      rawStream: this.rawStream && this.rawStream.toJSON ? this.rawStream.toJSON() : null
     }
   }
 }
