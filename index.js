@@ -27,7 +27,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.remotePublicKey = opts.remotePublicKey || null
     this.handshakeHash = null
     this.connected = false
-    this.keepAlive = 0
+    this.keepAlive = opts.keepAlive || 0
     this.timeout = 0
 
     // pointer for upstream to set data here if they want
