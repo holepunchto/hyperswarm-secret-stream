@@ -27,6 +27,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.remotePublicKey = opts.remotePublicKey || null
     this.handshakeHash = null
     this.connected = false
+    this.keepAlive = 0
+    this.timeout = 0
 
     // pointer for upstream to set data here if they want
     this.userData = null
@@ -58,10 +60,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._ended = 2
     this._encrypt = null
     this._decrypt = null
-    this._timeout = null
-    this._timeoutMs = 0
-    this._keepAlive = null
-    this.keepAlive = 0
+    this._timeoutTimer = null
+    this._keepAliveTimer = null
 
     if (opts.autoStart !== false) this.start(rawStream, opts)
 
@@ -82,12 +82,12 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (!ms) ms = 0
 
     this._clearTimeout()
-    this._timeoutMs = ms
+    this.timeout = ms
 
     if (!ms || this.rawStream === null) return
 
-    this._timeout = Timeout.once(ms, destroyTimeout, this)
-    this._timeout.unref()
+    this._timeoutTimer = Timeout.once(ms, destroyTimeout, this)
+    this._timeoutTimer.unref()
   }
 
   setKeepAlive (ms) {
@@ -97,8 +97,8 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     if (!ms || this.rawStream === null) return
 
-    this._keepAlive = Timeout.on(ms, sendKeepAlive, this)
-    this._keepAlive.unref()
+    this._keepAliveTimer = Timeout.on(ms, sendKeepAlive, this)
+    this._keepAliveTimer.unref()
   }
 
   start (rawStream, opts = {}) {
@@ -124,12 +124,12 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (opts.data) this._onrawdata(opts.data)
     if (opts.ended) this._onrawend()
 
-    if (this.keepAlive > 0 && this._keepAlive === null) {
+    if (this.keepAlive > 0 && this._keepAliveTimer === null) {
       this.setKeepAlive(this.keepAlive)
     }
 
-    if (this._timeoutMs > 0 && this._timeout === null) {
-      this.setTimeout(this._timeoutMs)
+    if (this.timeout > 0 && this._timeoutTimer === null) {
+      this.setTimeout(this.timeout)
     }
   }
 
@@ -200,8 +200,8 @@ module.exports = class NoiseSecretStream extends Duplex {
   _onrawdata (data) {
     let offset = 0
 
-    if (this._timeout !== null) {
-      this._timeout.refresh()
+    if (this._timeoutTimer !== null) {
+      this._timeoutTimer.refresh()
     }
 
     do {
@@ -435,7 +435,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     // offset 4 so we can do it in-place
     this._encrypt.next(wrapped.subarray(4, 4 + data.byteLength), wrapped.subarray(3))
 
-    if (this._keepAlive !== null) this._keepAlive.refresh()
+    if (this._keepAliveTimer !== null) this._keepAliveTimer.refresh()
 
     if (this._rawStream.write(wrapped) === false) {
       this._drainDone = cb
@@ -462,16 +462,16 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _clearTimeout () {
-    if (this._timeout === null) return
-    this._timeout.destroy()
-    this._timeout = null
-    this._timeoutMs = 0
+    if (this._timeoutTimer === null) return
+    this._timeoutTimer.destroy()
+    this._timeoutTimer = null
+    this.timeout = 0
   }
 
   _clearKeepAlive () {
-    if (this._keepAlive === null) return
-    this._keepAlive.destroy()
-    this._keepAlive = null
+    if (this._keepAliveTimer === null) return
+    this._keepAliveTimer.destroy()
+    this._keepAliveTimer = null
     this.keepAlive = 0
   }
 
