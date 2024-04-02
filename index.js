@@ -78,6 +78,10 @@ module.exports = class NoiseSecretStream extends Duplex {
     return streamId(handshakeHash, isInitiator, id)
   }
 
+  get keepAliveMs () {
+    return this._keepAliveMs
+  }
+
   setTimeout (ms) {
     if (!ms) ms = 0
 
