@@ -459,7 +459,7 @@ test('keep alive', function (t) {
 
   a.setKeepAlive(500)
   b.setKeepAlive(500)
-  t.is(a.keepAliveMs, 500)
+  t.is(a.keepAlive, 500)
 
   a.resume()
 

@@ -115,7 +115,7 @@ Populated after `open` is emitted.
 Get the unique hash of this handshake.
 Populated after `open` is emitted.
 
-#### `s.keepAliveMs`
+#### `s.keepAlive`
 
 Get the interval (in milliseconds) at which keep-alive messages are sent (0 means none are sent).
 
