@@ -450,7 +450,7 @@ test('can timeout', function (t) {
 })
 
 test('keep alive', function (t) {
-  t.plan(1)
+  t.plan(2)
 
   const a = new NoiseStream(true)
   const b = new NoiseStream(false)
@@ -459,6 +459,7 @@ test('keep alive', function (t) {
 
   a.setKeepAlive(500)
   b.setKeepAlive(500)
+  t.is(a.keepAlive, 500)
 
   a.resume()
 
