@@ -482,6 +482,35 @@ test('keep alive', function (t) {
   }
 })
 
+test('keep-alive messages are not forwarded to the noise stream', async function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.setKeepAlive(1)
+  // No keep-alive for b
+
+  a.resume()
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  b.on('data', function (data) {
+    if (data.toString() !== 'an actual message') {
+      t.fail('keep-alive message forwarded to the stream')
+      return
+    }
+    t.pass('Received the actual message')
+    t.is(rawStreamCounter > 5, true, 'sanity check: keep-alive packets were being sent')
+  })
+
+  // TODO: figure out why listening to b.rawStream doesn't work
+  let rawStreamCounter = 0
+  b._rawStream.on('data', (d) => rawStreamCounter++)
+
+  setTimeout(() => a.write('an actual message'), 100)
+})
+
 test('message is too large', function (t) {
   t.plan(2)
 

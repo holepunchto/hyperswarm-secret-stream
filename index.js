@@ -319,8 +319,8 @@ module.exports = class NoiseSecretStream extends Duplex {
       return
     }
 
-    // If keep alive is selective, eat the empty buffers (ie assume the other side has it enabled also)
-    if (plain.byteLength === 0 && this._keepAliveMs !== 0) return
+    // All empty messages are swallowed, because it's asumed they're keep-alive messages
+    if (plain.byteLength === 0) return
 
     if (this.push(plain) === false) {
       this.rawStream.pause()
