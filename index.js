@@ -6,6 +6,7 @@ const b4a = require('b4a')
 const Timeout = require('timeout-refresh')
 const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
+const { createTracer } = require('hypertrace')
 
 const IDHEADERBYTES = HEADERBYTES + 32
 const [NS_INITIATOR, NS_RESPONDER] = crypto.namespace('hyperswarm/secret-stream', 2)
@@ -18,6 +19,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (typeof isInitiator !== 'boolean') {
       throw new Error('isInitiator should be a boolean')
     }
+
+    this.tracer = createTracer(this)
 
     this.noiseStream = this
     this.isInitiator = isInitiator
@@ -198,6 +201,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _onrawdata (data) {
+    this.tracer.trace('_onrawdata')
     let offset = 0
 
     if (this._timeoutTimer !== null) {
@@ -418,6 +422,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _write (data, cb) {
+    this.tracer.trace('_write')
     let wrapped = this._outgoingWrapped
 
     if (data !== this._outgoingPlain) {
