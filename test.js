@@ -530,3 +530,133 @@ function createHandshake () {
     }
   })
 }
+
+// unsafeDisableEncryption tests
+
+test('unsafeDisableEncryption: data is not encrypted', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true, null, { unsafeDisableEncryption: true })
+  const b = new NoiseStream(false, null, { unsafeDisableEncryption: true })
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.write(Buffer.from('plaintext'))
+
+  const buf = []
+
+  a.rawStream.on('data', function (data) {
+    buf.push(Buffer.from(data))
+  })
+
+  b.on('data', function (data) {
+    t.alike(data, Buffer.from('plaintext'))
+    t.ok(Buffer.concat(buf).indexOf(Buffer.from('plaintext')) > -1)
+  })
+})
+
+test('unsafeDisableEncryption: works with tiny chunks', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true, null, { unsafeDisableEncryption: true })
+  const b = new NoiseStream(false, null, { unsafeDisableEncryption: true })
+
+  const tmp = crypto.randomBytes(40000)
+
+  a.write(Buffer.from('hello world'))
+  a.write(tmp)
+
+  a.rawStream.on('data', function (data) {
+    for (let i = 0; i < data.byteLength; i++) {
+      b.rawStream.write(data.subarray(i, i + 1))
+    }
+  })
+
+  b.rawStream.on('data', function (data) {
+    for (let i = 0; i < data.byteLength; i++) {
+      a.rawStream.write(data.subarray(i, i + 1))
+    }
+  })
+
+  b.once('data', function (data) {
+    t.alike(data, Buffer.from('hello world'))
+    b.once('data', function (data) {
+      t.alike(data, tmp)
+    })
+  })
+})
+
+test('unsafeDisableEncryption: send and recv lots of data', function (t) {
+  t.plan(3)
+
+  const a = new NoiseStream(true, null, { unsafeDisableEncryption: true })
+  const b = new NoiseStream(false, null, { unsafeDisableEncryption: true })
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  const buf = crypto.randomBytes(65536)
+  let size = 1024 * 1024 * 1024 // 1gb
+
+  const r = new Readable({
+    read (cb) {
+      this.push(buf)
+      size -= buf.byteLength
+      if (size <= 0) this.push(null)
+      cb(null)
+    }
+  })
+
+  r.pipe(a)
+
+  const then = Date.now()
+  let recv = 0
+  let same = true
+
+  b.on('data', function (data) {
+    if (same) same = data.equals(buf)
+    recv += data.byteLength
+  })
+  b.on('end', function () {
+    t.is(recv, 1024 * 1024 * 1024)
+    t.ok(same, 'data was the same')
+    t.pass('1gb transfer took ' + (Date.now() - then) + 'ms')
+  })
+})
+
+test('unsafeDisableEncryption: send garbage handshake data', function (t) {
+  t.plan(2)
+
+  check(Buffer.alloc(65536))
+  check(Buffer.from('\x10\x00\x00garbagegarbagegarbage'))
+
+  function check (buf) {
+    const a = new NoiseStream(true)
+
+    a.on('error', function () {
+      t.pass('handshake errored')
+    })
+
+    a.rawStream.write(buf)
+  }
+})
+
+test('unsafeDisableEncryption: send garbage secretstream header data', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true, null, { unsafeDisableEncryption: true })
+  const b = new NoiseStream(false, null, { unsafeDisableEncryption: true })
+
+  b.on('error', () => {})
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.on('error', function () {
+    t.pass('header errored')
+  })
+
+  a.on('open', function () {
+    t.pass('opened')
+    a.rawStream.write(Buffer.from([0xff, 0, 0]))
+    a.rawStream.write(crypto.randomBytes(0xff))
+  })
+})
