@@ -101,6 +101,11 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._keepAliveTimer.unref()
   }
 
+  sendKeepAlive () {
+    const empty = this.alloc(0)
+    this.write(empty)
+  }
+
   start (rawStream, opts = {}) {
     if (rawStream) {
       this.rawStream = rawStream
