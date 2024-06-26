@@ -119,6 +119,22 @@ Populated after `open` is emitted.
 
 Get the interval (in milliseconds) at which keep-alive messages are sent (0 means none are sent).
 
+#### `s.sendKeepAlive()`
+
+A convenience method that sends an empty message.
+
+#### `s.bytesWritten`
+
+The number of bytes (measured after encryption) written.
+
+#### `s.bytesReceived`
+
+The number of bytes (measured before decryption) received.
+
+#### `s.isEstablished()`
+
+Returns a boolean. A connection is "established" once data has been written and received.
+
 #### `s.on('connect', onconnect)`
 
 Emitted when the handshake is fully done.
