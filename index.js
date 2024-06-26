@@ -81,10 +81,6 @@ module.exports = class NoiseSecretStream extends Duplex {
     return streamId(handshakeHash, isInitiator, id)
   }
 
-  isEstablished () {
-    return this.rawBytesRead > 0 && this.rawBytesWritten > 0
-  }
-
   setTimeout (ms) {
     if (!ms) ms = 0
 

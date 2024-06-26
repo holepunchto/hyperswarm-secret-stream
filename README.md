@@ -131,10 +131,6 @@ The number of bytes (measured after encryption) written.
 
 The number of bytes (measured before decryption) received.
 
-#### `s.isEstablished()`
-
-Returns a boolean. A connection is "established" once data has been written and received.
-
 #### `s.on('connect', onconnect)`
 
 Emitted when the handshake is fully done.
