@@ -123,11 +123,11 @@ Get the interval (in milliseconds) at which keep-alive messages are sent (0 mean
 
 A convenience method that sends an empty message.
 
-#### `s.bytesWritten`
+#### `s.rawBytesWritten`
 
 The number of bytes (measured after encryption) written.
 
-#### `s.bytesReceived`
+#### `s.rawBytesRead`
 
 The number of bytes (measured before decryption) received.
 

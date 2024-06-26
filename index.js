@@ -36,8 +36,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     let openedDone = null
     this.opened = new Promise((resolve) => { openedDone = resolve })
 
-    this.bytesWritten = 0
-    this.bytesReceived = 0
+    this.rawBytesWritten = 0
+    this.rawBytesRead = 0
 
     // unwrapped raw stream
     this._rawStream = null
@@ -82,7 +82,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   isEstablished () {
-    return this.bytesReceived > 0 && this.bytesWritten > 0
+    return this.rawBytesRead > 0 && this.rawBytesWritten > 0
   }
 
   setTimeout (ms) {
@@ -322,7 +322,7 @@ module.exports = class NoiseSecretStream extends Duplex {
       return
     }
 
-    this.bytesReceived += message.length
+    this.rawBytesRead += message.length
 
     const plain = message.subarray(1, message.byteLength - ABYTES + 1)
 
@@ -444,7 +444,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (wrapped.byteLength - 3 > MAX_ATOMIC_WRITE) {
       return cb(new Error('Message is too large for an atomic write. Max size is ' + MAX_ATOMIC_WRITE + ' bytes.'))
     }
-    this.bytesWritten += wrapped.byteLength
+    this.rawBytesWritten += wrapped.byteLength
 
     writeUint24le(wrapped.byteLength - 3, wrapped)
     // offset 4 so we can do it in-place
