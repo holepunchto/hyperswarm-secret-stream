@@ -32,6 +32,8 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     // pointer for upstream to set data here if they want
     this.userData = null
+    // public timestamp property for tie-breaking connections, set by the hyperdht handshake
+    this.timestamp = 0
 
     let openedDone = null
     this.opened = new Promise((resolve) => { openedDone = resolve })
