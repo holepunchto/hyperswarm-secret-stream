@@ -39,6 +39,10 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.rawBytesWritten = 0
     this.rawBytesRead = 0
 
+    // metadata used by 'hyperdht'
+    this.relay = null
+    this.puncher = null
+
     // unwrapped raw stream
     this._rawStream = null
 
