@@ -98,6 +98,11 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   setKeepAlive (ms) {
+    if (this._keepAliveTimer) {
+      if (this.keepAlive === ms) return
+      this._clearKeepAlive()
+    }
+
     if (!ms) ms = 0
 
     this.keepAlive = ms
