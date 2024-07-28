@@ -523,20 +523,39 @@ test('set keep alive multiple times (no mem leak)', function (t) {
   }
 })
 
-test('setting keep alive to same value does nothing', function (t) {
-  const a = new NoiseStream(true)
+test('setting keep alive before the stream starts works', function (t) {
+  t.plan(2)
+
+  const a = new NoiseStream(true, null, { autoStart: false })
+  const b = new NoiseStream(false, null, { autoStart: false })
+
+  let i = 0
 
   a.setKeepAlive(500)
-  t.is(a.keepAlive, 500, 'sanity check')
+  b.setKeepAlive(500)
+  t.is(a.keepAlive, 500)
 
-  // Needs access to internals to test
-  const initTimer = a._keepAliveTimer
+  a.start()
+  b.start()
 
-  a.setKeepAlive(500)
-  t.is(initTimer === a._keepAliveTimer, true, 'not replaced')
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+  b.rawStream.on('data', function (data) {
+    if (data.byteLength === 20) { // empty message
+      clearInterval(interval)
+      t.ok(i > 10, 'keep alive when idle')
+      a.end()
+      b.end()
+    }
+  })
 
-  a.setKeepAlive(600)
-  t.is(initTimer === a._keepAliveTimer, false, 'replaced (sanity check')
+  const interval = setInterval(tick, 100)
+
+  function tick () {
+    i++
+    if (i < 10) {
+      b.write('hi')
+    }
+  }
 })
 
 test('message is too large', function (t) {
