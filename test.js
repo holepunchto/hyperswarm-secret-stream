@@ -605,3 +605,36 @@ function createHandshake () {
     }
   })
 }
+
+test('basic - unslab checks', function (t) {
+  t.plan(10)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+
+  a.on('open', function () {
+    const push = a._encrypt
+    const pull = a._decrypt
+
+    t.ok(push.key.buffer.byteLength < 100, 'push.key.buffer no slab')
+    t.ok(push.state.buffer.byteLength < 100, 'push.state.buffer no slab')
+    t.ok(push.header.buffer.byteLength < 100, 'push.header.buffer no slab')
+
+    t.ok(pull.key.buffer.byteLength < 100, 'pull.key.buffer no slab')
+    t.ok(pull.state.buffer.byteLength < 100, 'pull.state.buffer no slab')
+  })
+
+  b.on('open', function () {
+    const push = a._encrypt
+    const pull = a._decrypt
+
+    t.ok(push.key.buffer.byteLength < 100, 'push.key.buffer no slab')
+    t.ok(push.state.buffer.byteLength < 100, 'push.state.buffer no slab')
+    t.ok(push.header.buffer.byteLength < 100, 'push.header.buffer no slab')
+
+    t.ok(pull.key.buffer.byteLength < 100, 'pull.key.buffer no slab')
+    t.ok(pull.state.buffer.byteLength < 100, 'pull.state.buffer no slab')
+  })
+})
