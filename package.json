@@ -3,6 +3,10 @@
   "version": "6.6.3",
   "description": "Secret stream backed by Noise and libsodium's secretstream",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "lib/**.js"
+  ],
   "dependencies": {
     "b4a": "^1.1.0",
     "hypercore-crypto": "^3.3.1",
