@@ -11,7 +11,8 @@
     "sodium-secretstream": "^1.1.0",
     "sodium-universal": "^4.0.0",
     "streamx": "^2.14.0",
-    "timeout-refresh": "^2.0.0"
+    "timeout-refresh": "^2.0.0",
+    "unslab": "^1.3.0"
   },
   "devDependencies": {
     "brittle": "^3.3.0",

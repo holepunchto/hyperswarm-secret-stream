@@ -4,6 +4,7 @@ const crypto = require('hypercore-crypto')
 const { Duplex, Writable, getStreamError } = require('streamx')
 const b4a = require('b4a')
 const Timeout = require('timeout-refresh')
+const unslab = require('unslab')
 const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
@@ -365,11 +366,11 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _setupSecretStream (tx, rx, handshakeHash, publicKey, remotePublicKey) {
-    const buf = b4a.allocUnsafe(3 + IDHEADERBYTES)
+    const buf = b4a.allocUnsafeSlow(3 + IDHEADERBYTES)
     writeUint24le(IDHEADERBYTES, buf)
 
-    this._encrypt = new Push(tx.subarray(0, KEYBYTES), undefined, buf.subarray(3 + 32))
-    this._decrypt = new Pull(rx.subarray(0, KEYBYTES))
+    this._encrypt = new Push(unslab(tx.subarray(0, KEYBYTES)), undefined, buf.subarray(3 + 32))
+    this._decrypt = new Pull(unslab(rx.subarray(0, KEYBYTES)))
 
     this.publicKey = publicKey
     this.remotePublicKey = remotePublicKey
