@@ -20,7 +20,8 @@
   },
   "devDependencies": {
     "brittle": "^3.3.0",
-    "standard": "^17.1.0"
+    "standard": "^17.1.0",
+    "udx-native": "^1.13.2"
   },
   "scripts": {
     "test": "standard && brittle test.js"
