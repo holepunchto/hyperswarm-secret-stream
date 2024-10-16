@@ -11,6 +11,7 @@ const Handshake = require('./lib/handshake')
 const IDHEADERBYTES = HEADERBYTES + 32
 const [NS_INITIATOR, NS_RESPONDER, NS_BOX] = crypto.namespace('hyperswarm/secret-stream', 3)
 const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
+const MAX_NONCE_PREFIX = b4a.fill(b4a.allocUnsafeSlow(8), 0xff)
 
 module.exports = class NoiseSecretStream extends Duplex {
   constructor (isInitiator, rawStream, opts = {}) {
@@ -71,7 +72,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._timeoutTimer = null
     this._keepAliveTimer = null
     this._boxSecret = null
-    this._boxNonce = null
+    this._boxNonceEncrypt = null
+    this._boxNonceDecrypt = null
 
     if (opts.autoStart !== false) this.start(rawStream, opts)
 
@@ -378,14 +380,19 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.remotePublicKey = remotePublicKey
     this.handshakeHash = handshakeHash
 
-    // initialize secretbox for unordered messages
-    this._boxSecret = b4a.allocUnsafe(32)
-    sodium.crypto_generichash(this._boxSecret, NS_BOX, handshakeHash)
-    this._boxNonce = b4a.allocUnsafe(sodium.crypto_secretbox_NONCEBYTES)
-    sodium.randombytes_buf(this._boxNonce)
-
     const id = buf.subarray(3, 3 + 32)
     streamId(handshakeHash, this.isInitiator, id)
+
+    // setup secretbox state for unordered messages
+    this._boxSecret = b4a.allocUnsafeSlow(32)
+    this._boxNonceEncrypt = b4a.allocUnsafeSlow(sodium.crypto_secretbox_NONCEBYTES)
+    this._boxNonceDecrypt = b4a.allocUnsafeSlow(sodium.crypto_secretbox_NONCEBYTES)
+
+    sodium.crypto_generichash(this._boxSecret, NS_BOX, handshakeHash)
+    sodium.crypto_generichash(this._boxNonceEncrypt, b4a.concat([NS_BOX, publicKey]), handshakeHash)
+    sodium.crypto_generichash(this._boxNonceDecrypt, b4a.concat([NS_BOX, remotePublicKey]), handshakeHash)
+    b4a.fill(this._boxNonceDecrypt, 0, 0, 8) // zerofill first 8 bytes
+    b4a.fill(this._boxNonceEncrypt, 0, 0, 8)
 
     this.emit('handshake')
     // if rawStream is a bridge, also emit it there
@@ -509,35 +516,48 @@ module.exports = class NoiseSecretStream extends Duplex {
     cb(null)
   }
 
-  async _boxMessage (buffer) {
-    if (!this._boxSecret) await new Promise(resolve => this.once('handshake', resolve))
-    const nonce = this._boxNonce
-    sodium.sodium_increment(nonce)
-    const envelope = b4a.allocUnsafe(nonce.length + buffer.length + sodium.crypto_secretbox_MACBYTES)
-    sodium.crypto_secretbox_easy(envelope.subarray(nonce.length), buffer, nonce, this._boxSecret)
-    envelope.set(this._boxNonce)
+  _boxMessage (buffer) {
+    const nonce = this._boxNonceEncrypt
+    const prefix = nonce.subarray(0, 8)
+    if (b4a.equals(prefix, MAX_NONCE_PREFIX)) throw new Error('nonce exhausted')
+
+    const envelope = b4a.allocUnsafe(8 + buffer.length + sodium.crypto_secretbox_MACBYTES)
+    const ciphertext = envelope.subarray(8)
+
+    sodium.crypto_secretbox_easy(ciphertext, buffer, nonce, this._boxSecret)
+    envelope.set(prefix)
+
+    sodium.sodium_increment(prefix)
     return envelope
   }
 
-  async send (buffer) {
+  send (buffer) {
+    if (!this._boxSecret) return
     if (!this.rawStream?.send) return // udx-stream expected
-    const message = await this._boxMessage(buffer)
+
+    const message = this._boxMessage(buffer)
     return this.rawStream.send(message)
   }
 
   trySend (buffer) {
+    if (!this._boxSecret) return
     if (!this.rawStream?.trySend) return // udx-stream expected
-    this._boxMessage(buffer)
-      .then(message => this.rawStream.send(message))
+
+    const message = this._boxMessage(buffer)
+    this.rawStream.trySend(message)
   }
 
-  async _onmessage (buffer) {
-    if (!this._boxSecret) await new Promise(resolve => this.once('handshake', resolve))
-    const NB = sodium.crypto_secretbox_NONCEBYTES
-    const nonce = buffer.subarray(0, NB)
-    const cipher = buffer.subarray(NB)
-    const plain = buffer.subarray(NB, buffer.length - sodium.crypto_secretbox_MACBYTES)
-    const success = sodium.crypto_secretbox_open_easy(plain, cipher, nonce, this._boxSecret)
+  _onmessage (buffer) {
+    if (!this._boxSecret) return // messages before handshake are dropped
+
+    const nonce = this._boxNonceDecrypt
+    nonce.set(buffer.subarray(0, 8)) // update prefix
+
+    const ciphertext = buffer.subarray(8)
+    const plain = buffer.subarray(8, buffer.length - sodium.crypto_secretbox_MACBYTES)
+
+    const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, this._boxSecret)
+
     if (success) this.emit('message', plain)
   }
 

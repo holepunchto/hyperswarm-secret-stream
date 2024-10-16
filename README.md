@@ -139,7 +139,7 @@ internally before the handshake has been completed.
 
 #### `await s.send(buffer)`
 Sends an encrypted unordered message, see [udx-native](https://github.com/holepunchto/udx-native/tree/main?tab=readme-ov-file#await-streamsendbuffer) for details.  
-This method with silently fail if the underlying rawStream is not an UDX-stream.
+This method with silently fail if called before handshake is complete or if the underlying rawStream is not an UDX-stream (not capable of UDP).
 
 #### `s.trySend(buffer)`
 Same as `send(buffer)` but does not return a promise.

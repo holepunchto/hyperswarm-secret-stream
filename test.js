@@ -657,7 +657,8 @@ test('encrypted unordered message', async function (t) {
 
   const transmission1 = new Promise(resolve => b.once('message', resolve))
 
-  await new Promise(resolve => a.once('connect', resolve))
+  await a.opened
+  await b.opened
 
   await a.send(message)
 
