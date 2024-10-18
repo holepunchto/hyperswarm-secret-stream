@@ -70,8 +70,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._decrypt = null
     this._timeoutTimer = null
     this._keepAliveTimer = null
-    this._boxSecret = null
-    this._boxSeq = null
+    this._sendState = null
 
     if (opts.autoStart !== false) this.start(rawStream, opts)
 
@@ -382,7 +381,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     streamId(handshakeHash, this.isInitiator, id)
 
     // initialize secretbox state for unordered messages
-    this._setupSecretBox(handshakeHash)
+    this._setupSecretSend(handshakeHash)
 
     this.emit('handshake')
     // if rawStream is a bridge, also emit it there
@@ -393,18 +392,22 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.write(buf)
   }
 
-  _setupSecretBox (handshakeHash) {
-    this._boxSecret = b4a.allocUnsafeSlow(64) // encrypt<32>, decrypt<32>
-    this._boxSeq = b4a.allocUnsafeSlow(16) // increment<8>, initial<8>
+  _setupSecretSend (handshakeHash) {
+    this._sendState = b4a.allocUnsafeSlow(32 + 32 + 8 + 8)
+    const encrypt = this._sendState.subarray(0, 32) // secrets
+    const decrypt = this._sendState.subarray(32, 64)
+    const counter = this._sendState.subarray(64, 72) // nonce
+    const initial = this._sendState.subarray(72)
 
-    const inputs = [b4a.concat([NS_INITIATOR, NS_BOX]), b4a.concat([NS_RESPONDER, NS_BOX])]
-    if (!this.isInitiator) inputs.reverse()
+    const inputs = this.isInitiator
+      ? [[NS_INITIATOR, NS_BOX], [NS_RESPONDER, NS_BOX]]
+      : [[NS_RESPONDER, NS_BOX], [NS_INITIATOR, NS_BOX]]
 
-    sodium.crypto_generichash(this._boxSecret.subarray(0, 32), inputs[0], handshakeHash)
-    sodium.crypto_generichash(this._boxSecret.subarray(32), inputs[1], handshakeHash)
+    sodium.crypto_generichash_batch(encrypt, inputs[0], handshakeHash)
+    sodium.crypto_generichash_batch(decrypt, inputs[1], handshakeHash)
 
-    sodium.randombytes_buf(this._boxSeq.subarray(8))
-    this._boxSeq.set(this._boxSeq.subarray(8))
+    sodium.randombytes_buf(initial)
+    counter.set(initial)
   }
 
   _open (cb) {
@@ -524,26 +527,26 @@ module.exports = class NoiseSecretStream extends Duplex {
     const MB = sodium.crypto_secretbox_MACBYTES // 16
     const NB = sodium.crypto_secretbox_NONCEBYTES // 24
 
-    const prefix = this._boxSeq.subarray(0, 8)
-    sodium.sodium_increment(prefix)
-    if (b4a.equals(prefix, this._boxSeq.subarray(8))) {
+    const counter = this._sendState.subarray(64, 72)
+    sodium.sodium_increment(counter)
+    if (b4a.equals(counter, this._sendState.subarray(72))) {
       this.destroy(new Error('udp send nonce exchausted'))
     }
 
-    const secret = this._boxSecret.subarray(0, 32)
+    const secret = this._sendState.subarray(0, 32)
     const envelope = b4a.allocUnsafe(8 + MB + buffer.length)
     const nonce = envelope.subarray(0, NB)
     const ciphertext = envelope.subarray(8)
 
-    nonce.set(this.remotePublicKey.subarray(0, NB)) // pad suffix
-    nonce.set(prefix)
+    b4a.fill(nonce, 0) // pad suffix
+    nonce.set(counter)
 
     sodium.crypto_secretbox_easy(ciphertext, buffer, nonce, secret)
     return envelope
   }
 
   send (buffer) {
-    if (!this._boxSecret) return
+    if (!this._sendState) return
     if (!this.rawStream?.send) return // udx-stream expected
 
     const message = this._boxMessage(buffer)
@@ -551,7 +554,7 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   trySend (buffer) {
-    if (!this._boxSecret) return
+    if (!this._sendState) return
     if (!this.rawStream?.trySend) return // udx-stream expected
 
     const message = this._boxMessage(buffer)
@@ -559,16 +562,16 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 
   _onmessage (buffer) {
-    if (!this._boxSecret) return // messages before handshake are dropped
+    if (!this._sendState) return // messages before handshake are dropped
 
     const MB = sodium.crypto_secretbox_MACBYTES // 16
     const NB = sodium.crypto_secretbox_NONCEBYTES // 24
 
     const nonce = b4a.allocUnsafe(NB)
-    nonce.set(this.publicKey.subarray(0, NB))
+    b4a.fill(nonce, 0)
     nonce.set(buffer.subarray(0, 8))
 
-    const secret = this._boxSecret.subarray(32)
+    const secret = this._sendState.subarray(32, 64)
     const ciphertext = buffer.subarray(8)
     const plain = buffer.subarray(8, buffer.length - MB)
 
