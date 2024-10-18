@@ -526,7 +526,9 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     const prefix = this._boxSeq.subarray(0, 8)
     sodium.sodium_increment(prefix)
-    if (b4a.equals(prefix, this._boxSeq.subarray(8))) throw new Error('nonce exhausted')
+    if (b4a.equals(prefix, this._boxSeq.subarray(8))) {
+      this.destroy(new Error('udp send nonce exchausted'))
+    }
 
     const secret = this._boxSecret.subarray(0, 32)
     const envelope = b4a.allocUnsafe(8 + MB + buffer.length)

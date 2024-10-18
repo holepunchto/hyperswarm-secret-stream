@@ -686,21 +686,3 @@ test('encrypted unordered message', async function (t) {
 
   await destroy()
 })
-
-test.skip('message fragmentation', async t => {
-  const [a, b, destroy] = udxPair()
-  const burstMTU = Buffer.allocUnsafe(6000) // UDP MTU ~1500 bytes
-
-  const transmission = new Promise(resolve => b.once('message', resolve))
-
-  await a.opened
-  await b.opened
-
-  await a.send(burstMTU)
-  console.log('big buffer sent')
-
-  const received = await transmission
-  t.ok(received.equals(burstMTU), 'fragmentation works')
-
-  await destroy()
-})
