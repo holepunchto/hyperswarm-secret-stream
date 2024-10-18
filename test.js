@@ -4,6 +4,7 @@ const Events = require('events')
 const crypto = require('crypto')
 const { Readable, Duplex } = require('streamx')
 const NoiseStream = require('./')
+const UDX = require('udx-native')
 
 test('basic', function (t) {
   t.plan(2)
@@ -637,4 +638,51 @@ test('basic - unslab checks', function (t) {
     t.ok(pull.key.buffer.byteLength < 100, 'pull.key.buffer no slab')
     t.ok(pull.state.buffer.byteLength < 100, 'pull.state.buffer no slab')
   })
+})
+
+function udxPair () {
+  const u = new UDX()
+  const socket1 = u.createSocket()
+  const socket2 = u.createSocket()
+  for (const s of [socket1, socket2]) s.bind()
+
+  const stream1 = u.createStream(1)
+  const stream2 = u.createStream(2)
+  stream1.connect(socket1, stream2.id, socket2.address().port, '127.0.0.1')
+  stream2.connect(socket2, stream1.id, socket1.address().port, '127.0.0.1')
+
+  return [
+    new NoiseStream(true, stream1),
+    new NoiseStream(false, stream2),
+
+    async () => {
+      for (const stream of [stream1, stream2]) stream.end()
+      await socket1.close()
+      await socket2.close()
+    }
+  ]
+}
+
+test('encrypted unordered message', async function (t) {
+  const [a, b, destroy] = udxPair()
+  const message = Buffer.from('plaintext', 'utf8')
+
+  const transmission1 = new Promise(resolve => b.once('message', resolve))
+
+  await a.opened
+  await b.opened
+
+  await a.send(message)
+
+  const m0 = await transmission1
+  t.ok(m0.equals(message), 'send(): received & decrypted')
+
+  const transmission2 = new Promise(resolve => a.once('message', resolve))
+
+  b.trySend(message)
+
+  const m1 = await transmission2
+  t.ok(m1.equals(message), 'trySend(): received & decrypted')
+
+  await destroy()
 })

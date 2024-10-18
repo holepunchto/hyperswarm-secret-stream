@@ -9,7 +9,7 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-const [NS_INITIATOR, NS_RESPONDER] = crypto.namespace('hyperswarm/secret-stream', 2)
+const [NS_INITIATOR, NS_RESPONDER, NS_BOX] = crypto.namespace('hyperswarm/secret-stream', 3)
 const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
 
 module.exports = class NoiseSecretStream extends Duplex {
@@ -70,6 +70,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._decrypt = null
     this._timeoutTimer = null
     this._keepAliveTimer = null
+    this._sendState = null
 
     if (opts.autoStart !== false) this.start(rawStream, opts)
 
@@ -379,6 +380,9 @@ module.exports = class NoiseSecretStream extends Duplex {
     const id = buf.subarray(3, 3 + 32)
     streamId(handshakeHash, this.isInitiator, id)
 
+    // initialize secretbox state for unordered messages
+    this._setupSecretSend(handshakeHash)
+
     this.emit('handshake')
     // if rawStream is a bridge, also emit it there
     if (this.rawStream !== this._rawStream) this.rawStream.emit('handshake')
@@ -386,6 +390,24 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this.destroying) return
 
     this._rawStream.write(buf)
+  }
+
+  _setupSecretSend (handshakeHash) {
+    this._sendState = b4a.allocUnsafeSlow(32 + 32 + 8 + 8)
+    const encrypt = this._sendState.subarray(0, 32) // secrets
+    const decrypt = this._sendState.subarray(32, 64)
+    const counter = this._sendState.subarray(64, 72) // nonce
+    const initial = this._sendState.subarray(72)
+
+    const inputs = this.isInitiator
+      ? [[NS_INITIATOR, NS_BOX], [NS_RESPONDER, NS_BOX]]
+      : [[NS_RESPONDER, NS_BOX], [NS_INITIATOR, NS_BOX]]
+
+    sodium.crypto_generichash_batch(encrypt, inputs[0], handshakeHash)
+    sodium.crypto_generichash_batch(decrypt, inputs[1], handshakeHash)
+
+    sodium.randombytes_buf(initial)
+    counter.set(initial)
   }
 
   _open (cb) {
@@ -398,6 +420,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.on('data', this._onrawdata.bind(this))
     this._rawStream.on('end', this._onrawend.bind(this))
     this._rawStream.on('drain', this._onrawdrain.bind(this))
+    this._rawStream.on('message', this._onmessage.bind(this))
 
     if (this._encrypt !== null) {
       this._resolveOpened(true)
@@ -498,6 +521,63 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._clearTimeout()
     this._resolveOpened(false)
     cb(null)
+  }
+
+  _boxMessage (buffer) {
+    const MB = sodium.crypto_secretbox_MACBYTES // 16
+    const NB = sodium.crypto_secretbox_NONCEBYTES // 24
+
+    const counter = this._sendState.subarray(64, 72)
+    sodium.sodium_increment(counter)
+    if (b4a.equals(counter, this._sendState.subarray(72))) {
+      this.destroy(new Error('udp send nonce exchausted'))
+    }
+
+    const secret = this._sendState.subarray(0, 32)
+    const envelope = b4a.allocUnsafe(8 + MB + buffer.length)
+    const nonce = envelope.subarray(0, NB)
+    const ciphertext = envelope.subarray(8)
+
+    b4a.fill(nonce, 0) // pad suffix
+    nonce.set(counter)
+
+    sodium.crypto_secretbox_easy(ciphertext, buffer, nonce, secret)
+    return envelope
+  }
+
+  send (buffer) {
+    if (!this._sendState) return
+    if (!this.rawStream?.send) return // udx-stream expected
+
+    const message = this._boxMessage(buffer)
+    return this.rawStream.send(message)
+  }
+
+  trySend (buffer) {
+    if (!this._sendState) return
+    if (!this.rawStream?.trySend) return // udx-stream expected
+
+    const message = this._boxMessage(buffer)
+    this.rawStream.trySend(message)
+  }
+
+  _onmessage (buffer) {
+    if (!this._sendState) return // messages before handshake are dropped
+
+    const MB = sodium.crypto_secretbox_MACBYTES // 16
+    const NB = sodium.crypto_secretbox_NONCEBYTES // 24
+
+    const nonce = b4a.allocUnsafe(NB)
+    b4a.fill(nonce, 0)
+    nonce.set(buffer.subarray(0, 8))
+
+    const secret = this._sendState.subarray(32, 64)
+    const ciphertext = buffer.subarray(8)
+    const plain = buffer.subarray(8, buffer.length - MB)
+
+    const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, secret)
+
+    if (success) this.emit('message', plain)
   }
 
   alloc (len) {
