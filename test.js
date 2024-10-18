@@ -640,20 +640,32 @@ test('basic - unslab checks', function (t) {
   })
 })
 
-test('encrypted unordered message', async function (t) {
-  const message = Buffer.from('plaintext', 'utf8')
+function udxPair () {
   const u = new UDX()
   const socket1 = u.createSocket()
   const socket2 = u.createSocket()
-  socket1.bind()
-  socket2.bind()
+  for (const s of [socket1, socket2]) s.bind()
+
   const stream1 = u.createStream(1)
   const stream2 = u.createStream(2)
   stream1.connect(socket1, stream2.id, socket2.address().port, '127.0.0.1')
   stream2.connect(socket2, stream1.id, socket1.address().port, '127.0.0.1')
 
-  const a = new NoiseStream(true, stream1)
-  const b = new NoiseStream(false, stream2)
+  return [
+    new NoiseStream(true, stream1),
+    new NoiseStream(false, stream2),
+
+    async () => {
+      for (const stream of [stream1, stream2]) stream.end()
+      await socket1.close()
+      await socket2.close()
+    }
+  ]
+}
+
+test('encrypted unordered message', async function (t) {
+  const [a, b, destroy] = udxPair()
+  const message = Buffer.from('plaintext', 'utf8')
 
   const transmission1 = new Promise(resolve => b.once('message', resolve))
 
@@ -672,8 +684,23 @@ test('encrypted unordered message', async function (t) {
   const m1 = await transmission2
   t.ok(m1.equals(message), 'trySend(): received & decrypted')
 
-  stream1.end()
-  stream2.end()
-  await socket1.close()
-  await socket2.close()
+  await destroy()
+})
+
+test.skip('message fragmentation', async t => {
+  const [a, b, destroy] = udxPair()
+  const burstMTU = Buffer.allocUnsafe(6000) // UDP MTU ~1500 bytes
+
+  const transmission = new Promise(resolve => b.once('message', resolve))
+
+  await a.opened
+  await b.opened
+
+  await a.send(burstMTU)
+  console.log('big buffer sent')
+
+  const received = await transmission
+  t.ok(received.equals(burstMTU), 'fragmentation works')
+
+  await destroy()
 })
