@@ -223,7 +223,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     do {
       switch (this._state) {
         case 0: {
-          while (this._tmp !== 0x1000000 && offset < data.length) {
+          while (this._tmp !== 0x1000000 && offset < data.byteLength) {
             const v = data[offset++]
             this._len += this._tmp * v
             this._tmp *= 256
@@ -232,7 +232,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           if (this._tmp === 0x1000000) {
             this._tmp = 0
             this._state = 1
-            const unprocessed = data.length - offset
+            const unprocessed = data.byteLength - offset
             if (unprocessed < this._len && this._utp !== null) this._utp.setContentSize(this._len - unprocessed)
           }
 
@@ -243,14 +243,14 @@ module.exports = class NoiseSecretStream extends Duplex {
           const missing = this._len - this._tmp
           const end = missing + offset
 
-          if (this._message === null && end <= data.length) {
+          if (this._message === null && end <= data.byteLength) {
             this._message = data.subarray(offset, end)
             offset += missing
             this._incoming()
             break
           }
 
-          const unprocessed = data.length - offset
+          const unprocessed = data.byteLength - offset
 
           if (this._message === null) {
             this._message = b4a.allocUnsafe(this._len)
@@ -259,7 +259,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           b4a.copy(data, this._message, this._tmp, offset)
           this._tmp += unprocessed
 
-          if (end <= data.length) {
+          if (end <= data.byteLength) {
             offset += missing
             this._incoming()
           } else {
@@ -269,7 +269,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           break
         }
       }
-    } while (offset < data.length && !this.destroying)
+    } while (offset < data.byteLength && !this.destroying)
   }
 
   _onrawend () {
