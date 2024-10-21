@@ -9,7 +9,7 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-const [NS_INITIATOR, NS_RESPONDER, NS_BOX] = crypto.namespace('hyperswarm/secret-stream', 3)
+const [NS_INITIATOR, NS_RESPONDER, NS_SEND] = crypto.namespace('hyperswarm/secret-stream', 3)
 const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
 
 module.exports = class NoiseSecretStream extends Duplex {
@@ -400,8 +400,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const initial = this._sendState.subarray(72)
 
     const inputs = this.isInitiator
-      ? [[NS_INITIATOR, NS_BOX], [NS_RESPONDER, NS_BOX]]
-      : [[NS_RESPONDER, NS_BOX], [NS_INITIATOR, NS_BOX]]
+      ? [[NS_INITIATOR, NS_SEND], [NS_RESPONDER, NS_SEND]]
+      : [[NS_RESPONDER, NS_SEND], [NS_INITIATOR, NS_SEND]]
 
     sodium.crypto_generichash_batch(encrypt, inputs[0], handshakeHash)
     sodium.crypto_generichash_batch(decrypt, inputs[1], handshakeHash)
