@@ -530,11 +530,11 @@ module.exports = class NoiseSecretStream extends Duplex {
     const counter = this._sendState.subarray(64, 72)
     sodium.sodium_increment(counter)
     if (b4a.equals(counter, this._sendState.subarray(72))) {
-      this.destroy(new Error('udp send nonce exchausted'))
+      return this.destroy(new Error('udp send nonce exchausted'))
     }
 
     const secret = this._sendState.subarray(0, 32)
-    const envelope = b4a.allocUnsafe(8 + MB + buffer.length)
+    const envelope = b4a.allocUnsafe(8 + MB + buffer.byteLength)
     const nonce = envelope.subarray(0, NB)
     const ciphertext = envelope.subarray(8)
 
@@ -573,7 +573,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     const secret = this._sendState.subarray(32, 64)
     const ciphertext = buffer.subarray(8)
-    const plain = buffer.subarray(8, buffer.length - MB)
+    const plain = buffer.subarray(8, buffer.byteLength - MB)
 
     const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, secret)
 
