@@ -9,7 +9,7 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-const [NS_INITIATOR, NS_RESPONDER, NS_BOX] = crypto.namespace('hyperswarm/secret-stream', 3)
+const [NS_INITIATOR, NS_RESPONDER, NS_SEND] = crypto.namespace('hyperswarm/secret-stream', 3)
 const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
 
 module.exports = class NoiseSecretStream extends Duplex {
@@ -223,7 +223,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     do {
       switch (this._state) {
         case 0: {
-          while (this._tmp !== 0x1000000 && offset < data.length) {
+          while (this._tmp !== 0x1000000 && offset < data.byteLength) {
             const v = data[offset++]
             this._len += this._tmp * v
             this._tmp *= 256
@@ -232,7 +232,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           if (this._tmp === 0x1000000) {
             this._tmp = 0
             this._state = 1
-            const unprocessed = data.length - offset
+            const unprocessed = data.byteLength - offset
             if (unprocessed < this._len && this._utp !== null) this._utp.setContentSize(this._len - unprocessed)
           }
 
@@ -243,14 +243,14 @@ module.exports = class NoiseSecretStream extends Duplex {
           const missing = this._len - this._tmp
           const end = missing + offset
 
-          if (this._message === null && end <= data.length) {
+          if (this._message === null && end <= data.byteLength) {
             this._message = data.subarray(offset, end)
             offset += missing
             this._incoming()
             break
           }
 
-          const unprocessed = data.length - offset
+          const unprocessed = data.byteLength - offset
 
           if (this._message === null) {
             this._message = b4a.allocUnsafe(this._len)
@@ -259,7 +259,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           b4a.copy(data, this._message, this._tmp, offset)
           this._tmp += unprocessed
 
-          if (end <= data.length) {
+          if (end <= data.byteLength) {
             offset += missing
             this._incoming()
           } else {
@@ -269,7 +269,7 @@ module.exports = class NoiseSecretStream extends Duplex {
           break
         }
       }
-    } while (offset < data.length && !this.destroying)
+    } while (offset < data.byteLength && !this.destroying)
   }
 
   _onrawend () {
@@ -400,8 +400,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const initial = this._sendState.subarray(72)
 
     const inputs = this.isInitiator
-      ? [[NS_INITIATOR, NS_BOX], [NS_RESPONDER, NS_BOX]]
-      : [[NS_RESPONDER, NS_BOX], [NS_INITIATOR, NS_BOX]]
+      ? [[NS_INITIATOR, NS_SEND], [NS_RESPONDER, NS_SEND]]
+      : [[NS_RESPONDER, NS_SEND], [NS_INITIATOR, NS_SEND]]
 
     sodium.crypto_generichash_batch(encrypt, inputs[0], handshakeHash)
     sodium.crypto_generichash_batch(decrypt, inputs[1], handshakeHash)
@@ -531,10 +531,11 @@ module.exports = class NoiseSecretStream extends Duplex {
     sodium.sodium_increment(counter)
     if (b4a.equals(counter, this._sendState.subarray(72))) {
       this.destroy(new Error('udp send nonce exchausted'))
+      return
     }
 
     const secret = this._sendState.subarray(0, 32)
-    const envelope = b4a.allocUnsafe(8 + MB + buffer.length)
+    const envelope = b4a.allocUnsafe(8 + MB + buffer.byteLength)
     const nonce = envelope.subarray(0, NB)
     const ciphertext = envelope.subarray(8)
 
@@ -573,7 +574,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     const secret = this._sendState.subarray(32, 64)
     const ciphertext = buffer.subarray(8)
-    const plain = buffer.subarray(8, buffer.length - MB)
+    const plain = buffer.subarray(8, buffer.byteLength - MB)
 
     const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, secret)
 
