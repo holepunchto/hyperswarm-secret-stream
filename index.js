@@ -530,7 +530,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const counter = this._sendState.subarray(64, 72)
     sodium.sodium_increment(counter)
     if (b4a.equals(counter, this._sendState.subarray(72))) {
-      return this.destroy(new Error('udp send nonce exchausted'))
+      this.destroy(new Error('udp send nonce exchausted'))
+      return
     }
 
     const secret = this._sendState.subarray(0, 32)
