@@ -30,6 +30,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.connected = false
     this.keepAlive = opts.keepAlive || 0
     this.timeout = 0
+    this.setupOnMessage = opts.setupOnMessage !== false
 
     // pointer for upstream to set data here if they want
     this.userData = null
@@ -420,7 +421,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.on('data', this._onrawdata.bind(this))
     this._rawStream.on('end', this._onrawend.bind(this))
     this._rawStream.on('drain', this._onrawdrain.bind(this))
-    this._rawStream.on('message', this._onmessage.bind(this))
+
+    if (this.setupOnMessage) this._rawStream.on('message', this._onmessage.bind(this))
 
     if (this._encrypt !== null) {
       this._resolveOpened(true)

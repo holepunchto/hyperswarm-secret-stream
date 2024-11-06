@@ -63,7 +63,8 @@ Options include:
     hash,
     publicKey,
     remotePublicKey
-  }
+  },
+  setupOnMessage: true // (advanced) set false to not set up an onmessage handler
 }
 ```
 
