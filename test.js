@@ -5,6 +5,7 @@ const crypto = require('crypto')
 const { Readable, Duplex } = require('streamx')
 const NoiseStream = require('./')
 const UDX = require('udx-native')
+const sodium = require('sodium-native')
 
 test('basic', function (t) {
   t.plan(2)
@@ -683,6 +684,34 @@ test('encrypted unordered message', async function (t) {
 
   const m1 = await transmission2
   t.ok(m1.equals(message), 'trySend(): received & decrypted')
+
+  await destroy()
+})
+
+test('too short messages are ignored', async function (t) {
+  const [a, b, destroy] = udxPair()
+  const message = Buffer.from('plaintext', 'utf8')
+
+  const transmission1 = new Promise(resolve => b.once('message', resolve))
+
+  await a.opened
+  await b.opened
+
+  await a.send(message)
+
+  const m0 = await transmission1
+  t.ok(m0.equals(message), 'send(): received & decrypted', 'sanity check')
+
+  b.once('message', () => t.fail('invalid messages should not bubble up'))
+
+  // invalid nonce
+  a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES - 1)))
+
+  // invalid cipher text
+  a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES + 1)))
+
+  // In case errors take a tick to trigger
+  await new Promise(resolve => setImmediate(resolve))
 
   await destroy()
 })

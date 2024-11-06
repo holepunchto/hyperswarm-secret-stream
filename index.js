@@ -568,6 +568,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const MB = sodium.crypto_secretbox_MACBYTES // 16
     const NB = sodium.crypto_secretbox_NONCEBYTES // 24
 
+    if (buffer.byteLength < NB) return // Invalid message
+
     const nonce = b4a.allocUnsafe(NB)
     b4a.fill(nonce, 0)
     nonce.set(buffer.subarray(0, 8))
@@ -575,6 +577,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const secret = this._sendState.subarray(32, 64)
     const ciphertext = buffer.subarray(8)
     const plain = buffer.subarray(8, buffer.byteLength - MB)
+
+    if (ciphertext.byteLength < MB) return // invalid message
 
     const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, secret)
 
