@@ -64,7 +64,7 @@ Options include:
     publicKey,
     remotePublicKey
   },
-  setupOnMessage: true // (advanced) set false to not set up an onmessage handler
+  enableSend: true // (advanced) set false to disable the send API
 }
 ```
 

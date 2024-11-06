@@ -716,7 +716,7 @@ test('too short messages are ignored', async function (t) {
   await destroy()
 })
 
-test('setupOnMessage opt', async function (t) {
+test('enableSend opt', async function (t) {
   t.plan(1)
 
   const u = new UDX()
@@ -729,7 +729,7 @@ test('setupOnMessage opt', async function (t) {
   stream1.connect(socket1, stream2.id, socket2.address().port, '127.0.0.1')
   stream2.connect(socket2, stream1.id, socket1.address().port, '127.0.0.1')
 
-  const a = new NoiseStream(true, stream1, { setupOnMessage: false })
+  const a = new NoiseStream(true, stream1, { enableSend: false })
   const b = new NoiseStream(false, stream2)
 
   a.once('message', () => t.fail('should not have registered message handler'))
