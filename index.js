@@ -30,6 +30,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.connected = false
     this.keepAlive = opts.keepAlive || 0
     this.timeout = 0
+    this.enableSend = opts.enableSend !== false
 
     // pointer for upstream to set data here if they want
     this.userData = null
@@ -420,7 +421,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.on('data', this._onrawdata.bind(this))
     this._rawStream.on('end', this._onrawend.bind(this))
     this._rawStream.on('drain', this._onrawdrain.bind(this))
-    this._rawStream.on('message', this._onmessage.bind(this))
+
+    if (this.enableSend) this._rawStream.on('message', this._onmessage.bind(this))
 
     if (this._encrypt !== null) {
       this._resolveOpened(true)
@@ -568,6 +570,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const MB = sodium.crypto_secretbox_MACBYTES // 16
     const NB = sodium.crypto_secretbox_NONCEBYTES // 24
 
+    if (buffer.byteLength < NB) return // Invalid message
+
     const nonce = b4a.allocUnsafe(NB)
     b4a.fill(nonce, 0)
     nonce.set(buffer.subarray(0, 8))
@@ -575,6 +579,8 @@ module.exports = class NoiseSecretStream extends Duplex {
     const secret = this._sendState.subarray(32, 64)
     const ciphertext = buffer.subarray(8)
     const plain = buffer.subarray(8, buffer.byteLength - MB)
+
+    if (ciphertext.byteLength < MB) return // invalid message
 
     const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, secret)
 

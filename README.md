@@ -63,7 +63,8 @@ Options include:
     hash,
     publicKey,
     remotePublicKey
-  }
+  },
+  enableSend: true // (advanced) set false to disable the send API
 }
 ```
 

@@ -5,6 +5,7 @@ const crypto = require('crypto')
 const { Readable, Duplex } = require('streamx')
 const NoiseStream = require('./')
 const UDX = require('udx-native')
+const sodium = require('sodium-native')
 
 test('basic', function (t) {
   t.plan(2)
@@ -685,4 +686,63 @@ test('encrypted unordered message', async function (t) {
   t.ok(m1.equals(message), 'trySend(): received & decrypted')
 
   await destroy()
+})
+
+test('too short messages are ignored', async function (t) {
+  const [a, b, destroy] = udxPair()
+  const message = Buffer.from('plaintext', 'utf8')
+
+  const transmission1 = new Promise(resolve => b.once('message', resolve))
+
+  await a.opened
+  await b.opened
+
+  await a.send(message)
+
+  const m0 = await transmission1
+  t.ok(m0.equals(message), 'send(): received & decrypted', 'sanity check')
+
+  b.once('message', () => t.fail('invalid messages should not bubble up'))
+
+  // invalid nonce
+  a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES - 1)))
+
+  // invalid cipher text
+  a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES + 1)))
+
+  // In case errors take a tick to trigger
+  await new Promise(resolve => setImmediate(resolve))
+
+  await destroy()
+})
+
+test('enableSend opt', async function (t) {
+  t.plan(1)
+
+  const u = new UDX()
+  const socket1 = u.createSocket()
+  const socket2 = u.createSocket()
+  for (const s of [socket1, socket2]) s.bind()
+
+  const stream1 = u.createStream(1)
+  const stream2 = u.createStream(2)
+  stream1.connect(socket1, stream2.id, socket2.address().port, '127.0.0.1')
+  stream2.connect(socket2, stream1.id, socket1.address().port, '127.0.0.1')
+
+  const a = new NoiseStream(true, stream1, { enableSend: false })
+  const b = new NoiseStream(false, stream2)
+
+  a.once('message', () => t.fail('should not have registered message handler'))
+  b.once('message', async () => {
+    for (const stream of [stream1, stream2]) stream.end()
+    await socket1.close()
+    await socket2.close()
+    t.pass('by default the message handler is set')
+  })
+
+  await a.opened
+  await b.opened
+
+  await b.send(Buffer.from('b-message which does not bubble up at a'))
+  await a.send(Buffer.from('a-message which bubbles up at b'))
 })
