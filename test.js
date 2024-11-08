@@ -657,6 +657,7 @@ function udxPair () {
     new NoiseStream(false, stream2),
 
     async () => {
+      for (const stream of [stream1, stream2]) stream.on('error', noop)
       for (const stream of [stream1, stream2]) stream.end()
       await socket1.close()
       await socket2.close()
@@ -700,7 +701,7 @@ test('too short messages are ignored', async function (t) {
   await a.send(message)
 
   const m0 = await transmission1
-  t.ok(m0.equals(message), 'send(): received & decrypted', 'sanity check')
+  t.ok(m0.equals(message), 'send(): received & decrypted (sanity check)')
 
   b.once('message', () => t.fail('invalid messages should not bubble up'))
 
@@ -746,3 +747,5 @@ test('enableSend opt', async function (t) {
   await b.send(Buffer.from('b-message which does not bubble up at a'))
   await a.send(Buffer.from('a-message which bubbles up at b'))
 })
+
+function noop () {}
