@@ -655,13 +655,23 @@ function udxPair () {
   return [
     new NoiseStream(true, stream1),
     new NoiseStream(false, stream2),
-
-    async () => {
-      for (const stream of [stream1, stream2]) stream.end()
-      await socket1.close()
-      await socket2.close()
-    }
+    destroyPair
   ]
+
+  async function destroyPair () {
+    for (const stream of [stream1, stream2]) {
+      stream.destroy()
+      await streamClosed(stream)
+    }
+
+    await socket1.close()
+    await socket2.close()
+  }
+
+  async function streamClosed (stream) {
+    if (stream.destroyed) return
+    return new Promise(resolve => stream.once('close', resolve))
+  }
 }
 
 test('encrypted unordered message', async function (t) {
