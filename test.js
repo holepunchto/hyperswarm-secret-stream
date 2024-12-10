@@ -641,7 +641,7 @@ test('basic - unslab checks', function (t) {
   })
 })
 
-function udxPair (getOpts = (() => ({}))) {
+function udxPair (getOpts = () => ({})) {
   const u = new UDX()
   const socket1 = u.createSocket()
   const socket2 = u.createSocket()
