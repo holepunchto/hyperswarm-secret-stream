@@ -641,7 +641,7 @@ test('basic - unslab checks', function (t) {
   })
 })
 
-function udxPair () {
+function udxPair (getOpts = (() => ({}))) {
   const u = new UDX()
   const socket1 = u.createSocket()
   const socket2 = u.createSocket()
@@ -653,8 +653,8 @@ function udxPair () {
   stream2.connect(socket2, stream1.id, socket1.address().port, '127.0.0.1')
 
   return [
-    new NoiseStream(true, stream1),
-    new NoiseStream(false, stream2),
+    new NoiseStream(true, stream1, getOpts(0)),
+    new NoiseStream(false, stream2, getOpts(1)),
     destroyPair
   ]
 
@@ -729,24 +729,11 @@ test('too short messages are ignored', async function (t) {
 test('enableSend opt', async function (t) {
   t.plan(1)
 
-  const u = new UDX()
-  const socket1 = u.createSocket()
-  const socket2 = u.createSocket()
-  for (const s of [socket1, socket2]) s.bind()
-
-  const stream1 = u.createStream(1)
-  const stream2 = u.createStream(2)
-  stream1.connect(socket1, stream2.id, socket2.address().port, '127.0.0.1')
-  stream2.connect(socket2, stream1.id, socket1.address().port, '127.0.0.1')
-
-  const a = new NoiseStream(true, stream1, { enableSend: false })
-  const b = new NoiseStream(false, stream2)
+  const [a, b, destroy] = udxPair((n) => ({ enableSend: n !== 0 }))
 
   a.once('message', () => t.fail('should not have registered message handler'))
   b.once('message', async () => {
-    for (const stream of [stream1, stream2]) stream.end()
-    await socket1.close()
-    await socket2.close()
+    await destroy()
     t.pass('by default the message handler is set')
   })
 
