@@ -645,7 +645,7 @@ function udxPair (getOpts = () => ({})) {
   const u = new UDX()
   const socket1 = u.createSocket()
   const socket2 = u.createSocket()
-  for (const s of [socket1, socket2]) s.bind()
+  for (const s of [socket1, socket2]) s.bind(0, '0.0.0.0')
 
   const stream1 = u.createStream(1)
   const stream2 = u.createStream(2)
