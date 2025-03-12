@@ -1,6 +1,6 @@
 # @hyperswarm/secret-stream
 
-### [See the full API docs at docs.holepunch.to](https://docs.holepunch.to/building-blocks/hyperswarm#secretstream)
+### [See the full API docs at docs.holepunch.to](https://docs.pears.com/helpers/secretstream)
 
 Secret stream backed by Noise and libsodium's secretstream
 
@@ -79,7 +79,7 @@ for the resolution and auto destroy the stream if the promise errors.
 
 #### `s.start(rawStream, [options])`
 
-Start a SecretStream from a rawStream asynchrously.
+Start a SecretStream from a rawStream asynchronously.
 
 ``` js
 const s = new SecretStream({
@@ -146,7 +146,7 @@ This method with silently fail if called before handshake is complete or if the 
 Same as `send(buffer)` but does not return a promise.
 
 #### `s.on('message', onmessage)`
-Emmitted when an unordered message is received
+Emitted when an unordered message is received
 
 #### `keyPair = SecretStream.keyPair([seed])`
 
