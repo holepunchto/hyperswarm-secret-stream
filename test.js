@@ -277,11 +277,7 @@ test('pass in head buffer', async function (t) {
   a.write('test1')
   a.write('test2')
 
-  const expected = [
-    Buffer.from('test1'),
-    Buffer.from('test2'),
-    Buffer.from('test3')
-  ]
+  const expected = [Buffer.from('test1'), Buffer.from('test2'), Buffer.from('test3')]
 
   let done
   const promise = new Promise((resolve) => {
@@ -727,14 +723,10 @@ test('too short messages are ignored', async function (t) {
   b.once('message', () => t.fail('invalid messages should not bubble up'))
 
   // invalid nonce
-  a.rawStream.send(
-    Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES - 1))
-  )
+  a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES - 1)))
 
   // invalid cipher text
-  a.rawStream.send(
-    Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES + 1))
-  )
+  a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES + 1)))
 
   // In case errors take a tick to trigger
   await new Promise((resolve) => setImmediate(resolve))

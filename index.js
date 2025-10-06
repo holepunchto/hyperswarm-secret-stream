@@ -1,10 +1,4 @@
-const {
-  Pull,
-  Push,
-  HEADERBYTES,
-  KEYBYTES,
-  ABYTES
-} = require('sodium-secretstream')
+const { Pull, Push, HEADERBYTES, KEYBYTES, ABYTES } = require('sodium-secretstream')
 const sodium = require('sodium-universal')
 const crypto = require('hypercore-crypto')
 const { Duplex, Writable, getStreamError } = require('streamx')
@@ -15,10 +9,7 @@ const Bridge = require('./lib/bridge')
 const Handshake = require('./lib/handshake')
 
 const IDHEADERBYTES = HEADERBYTES + 32
-const [NS_INITIATOR, NS_RESPONDER, NS_SEND] = crypto.namespace(
-  'hyperswarm/secret-stream',
-  3
-)
+const [NS_INITIATOR, NS_RESPONDER, NS_SEND] = crypto.namespace('hyperswarm/secret-stream', 3)
 const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
 
 module.exports = class NoiseSecretStream extends Duplex {
@@ -197,12 +188,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     const pattern = this._handshakePattern || 'XX'
     const remotePublicKey = this.remotePublicKey
 
-    this._handshake = new Handshake(
-      this.isInitiator,
-      keyPair,
-      remotePublicKey,
-      pattern
-    )
+    this._handshake = new Handshake(this.isInitiator, keyPair, remotePublicKey, pattern)
     this.publicKey = this._handshake.keyPair.publicKey
   }
 
@@ -388,11 +374,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     const buf = b4a.allocUnsafeSlow(3 + IDHEADERBYTES)
     writeUint24le(IDHEADERBYTES, buf)
 
-    this._encrypt = new Push(
-      unslab(tx.subarray(0, KEYBYTES)),
-      undefined,
-      buf.subarray(3 + 32)
-    )
+    this._encrypt = new Push(unslab(tx.subarray(0, KEYBYTES)), undefined, buf.subarray(3 + 32))
     this._decrypt = new Pull(unslab(rx.subarray(0, KEYBYTES)))
 
     this.publicKey = publicKey
@@ -440,10 +422,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
   _open(cb) {
     // no autostart or no handshake yet
-    if (
-      this._rawStream === null ||
-      (this._handshake === null && this._encrypt === null)
-    ) {
+    if (this._rawStream === null || (this._handshake === null && this._encrypt === null)) {
       this._startDone = cb
       return
     }
@@ -452,8 +431,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.on('end', this._onrawend.bind(this))
     this._rawStream.on('drain', this._onrawdrain.bind(this))
 
-    if (this.enableSend)
-      this._rawStream.on('message', this._onmessage.bind(this))
+    if (this.enableSend) this._rawStream.on('message', this._onmessage.bind(this))
 
     if (this._encrypt !== null) {
       this._resolveOpened(true)
@@ -503,9 +481,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (wrapped.byteLength - 3 > MAX_ATOMIC_WRITE) {
       return cb(
         new Error(
-          'Message is too large for an atomic write. Max size is ' +
-            MAX_ATOMIC_WRITE +
-            ' bytes.'
+          'Message is too large for an atomic write. Max size is ' + MAX_ATOMIC_WRITE + ' bytes.'
         )
       )
     }
@@ -513,10 +489,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     writeUint24le(wrapped.byteLength - 3, wrapped)
     // offset 4 so we can do it in-place
-    this._encrypt.next(
-      wrapped.subarray(4, 4 + data.byteLength),
-      wrapped.subarray(3)
-    )
+    this._encrypt.next(wrapped.subarray(4, 4 + data.byteLength), wrapped.subarray(3))
 
     if (this._keepAliveTimer !== null) this._keepAliveTimer.refresh()
 
@@ -622,12 +595,7 @@ module.exports = class NoiseSecretStream extends Duplex {
 
     if (ciphertext.byteLength < MB) return // invalid message
 
-    const success = sodium.crypto_secretbox_open_easy(
-      plain,
-      ciphertext,
-      nonce,
-      secret
-    )
+    const success = sodium.crypto_secretbox_open_easy(plain, ciphertext, nonce, secret)
 
     if (success) this.emit('message', plain)
   }
@@ -643,13 +611,11 @@ module.exports = class NoiseSecretStream extends Duplex {
     return {
       isInitiator: this.isInitiator,
       publicKey: this.publicKey && b4a.toString(this.publicKey, 'hex'),
-      remotePublicKey:
-        this.remotePublicKey && b4a.toString(this.remotePublicKey, 'hex'),
+      remotePublicKey: this.remotePublicKey && b4a.toString(this.remotePublicKey, 'hex'),
       connected: this.connected,
       destroying: this.destroying,
       destroyed: this.destroyed,
-      rawStream:
-        this.rawStream && this.rawStream.toJSON ? this.rawStream.toJSON() : null
+      rawStream: this.rawStream && this.rawStream.toJSON ? this.rawStream.toJSON() : null
     }
   }
 }
@@ -661,11 +627,7 @@ function writeUint24le(n, buf) {
 }
 
 function streamId(handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
-  sodium.crypto_generichash(
-    out,
-    isInitiator ? NS_INITIATOR : NS_RESPONDER,
-    handshakeHash
-  )
+  sodium.crypto_generichash(out, isInitiator ? NS_INITIATOR : NS_RESPONDER, handshakeHash)
   return out
 }
 
