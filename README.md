@@ -12,7 +12,7 @@ npm install @hyperswarm/secret-stream
 
 You can either make a secret stream from an existing transport stream.
 
-``` js
+```js
 const SecretStream = require('@hyperswarm/secret-stream')
 
 const a = new SecretStream(true, tcpClientStream)
@@ -29,7 +29,7 @@ b.on('data', function (data) {
 
 Or by making your own pipeline
 
-``` js
+```js
 const a = new SecretStream(true)
 const b = new SecretStream(false)
 
@@ -81,7 +81,7 @@ for the resolution and auto destroy the stream if the promise errors.
 
 Start a SecretStream from a rawStream asynchrously.
 
-``` js
+```js
 const s = new SecretStream({
   autoStart: false // call start manually
 })
@@ -139,13 +139,16 @@ It is safe to write to the stream immediately though, as data is buffered
 internally before the handshake has been completed.
 
 #### `await s.send(buffer)`
+
 Sends an encrypted unordered message, see [udx-native](https://github.com/holepunchto/udx-native/tree/main?tab=readme-ov-file#await-streamsendbuffer) for details.  
 This method with silently fail if called before handshake is complete or if the underlying rawStream is not an UDX-stream (not capable of UDP).
 
 #### `s.trySend(buffer)`
+
 Same as `send(buffer)` but does not return a promise.
 
 #### `s.on('message', onmessage)`
+
 Emmitted when an unordered message is received
 
 #### `keyPair = SecretStream.keyPair([seed])`

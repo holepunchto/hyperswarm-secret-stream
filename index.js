@@ -13,7 +13,7 @@ const [NS_INITIATOR, NS_RESPONDER, NS_SEND] = crypto.namespace('hyperswarm/secre
 const MAX_ATOMIC_WRITE = 256 * 256 * 256 - 1
 
 module.exports = class NoiseSecretStream extends Duplex {
-  constructor (isInitiator, rawStream, opts = {}) {
+  constructor(isInitiator, rawStream, opts = {}) {
     super({ mapWritable: toBuffer })
 
     if (typeof isInitiator !== 'boolean') {
@@ -36,7 +36,9 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.userData = null
 
     let openedDone = null
-    this.opened = new Promise((resolve) => { openedDone = resolve })
+    this.opened = new Promise((resolve) => {
+      openedDone = resolve
+    })
 
     this.rawBytesWritten = 0
     this.rawBytesRead = 0
@@ -80,15 +82,15 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.pause()
   }
 
-  static keyPair (seed) {
+  static keyPair(seed) {
     return Handshake.keyPair(seed)
   }
 
-  static id (handshakeHash, isInitiator, id) {
+  static id(handshakeHash, isInitiator, id) {
     return streamId(handshakeHash, isInitiator, id)
   }
 
-  setTimeout (ms) {
+  setTimeout(ms) {
     if (!ms) ms = 0
 
     this._clearTimeout()
@@ -100,7 +102,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._timeoutTimer.unref()
   }
 
-  setKeepAlive (ms) {
+  setKeepAlive(ms) {
     if (!ms) ms = 0
 
     this._clearKeepAlive()
@@ -113,12 +115,12 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._keepAliveTimer.unref()
   }
 
-  sendKeepAlive () {
+  sendKeepAlive() {
     const empty = this.alloc(0)
     this.write(empty)
   }
 
-  start (rawStream, opts = {}) {
+  start(rawStream, opts = {}) {
     if (rawStream) {
       this.rawStream = rawStream
       this._rawStream = rawStream
@@ -150,7 +152,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
   }
 
-  async flush () {
+  async flush() {
     if ((await this.opened) === false) return false
     if ((await Writable.drained(this)) === false) return false
     if (this.destroying) return false
@@ -162,7 +164,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     return true
   }
 
-  _continueOpen (err) {
+  _continueOpen(err) {
     if (err) this.destroy(err)
     if (this._startDone === null) return
     const done = this._startDone
@@ -170,19 +172,19 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._open(done)
   }
 
-  _onkeypairpromise (p) {
+  _onkeypairpromise(p) {
     const self = this
     const cont = this._continueOpen.bind(this)
 
     p.then(onkeypair, cont)
 
-    function onkeypair (kp) {
+    function onkeypair(kp) {
       self._onkeypair(kp)
       cont(null)
     }
   }
 
-  _onkeypair (keyPair) {
+  _onkeypair(keyPair) {
     const pattern = this._handshakePattern || 'XX'
     const remotePublicKey = this.remotePublicKey
 
@@ -190,7 +192,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.publicKey = this._handshake.keyPair.publicKey
   }
 
-  _startHandshake (handshake, keyPair) {
+  _startHandshake(handshake, keyPair) {
     if (handshake) {
       const { tx, rx, hash, publicKey, remotePublicKey } = handshake
       this._setupSecretStream(tx, rx, hash, publicKey, remotePublicKey)
@@ -206,15 +208,15 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
   }
 
-  _onrawerror (err) {
+  _onrawerror(err) {
     this.destroy(err)
   }
 
-  _onrawclose () {
+  _onrawclose() {
     if (this._ended !== 0) this.destroy()
   }
 
-  _onrawdata (data) {
+  _onrawdata(data) {
     let offset = 0
 
     if (this._timeoutTimer !== null) {
@@ -234,7 +236,8 @@ module.exports = class NoiseSecretStream extends Duplex {
             this._tmp = 0
             this._state = 1
             const unprocessed = data.byteLength - offset
-            if (unprocessed < this._len && this._utp !== null) this._utp.setContentSize(this._len - unprocessed)
+            if (unprocessed < this._len && this._utp !== null)
+              this._utp.setContentSize(this._len - unprocessed)
           }
 
           break
@@ -273,24 +276,24 @@ module.exports = class NoiseSecretStream extends Duplex {
     } while (offset < data.byteLength && !this.destroying)
   }
 
-  _onrawend () {
+  _onrawend() {
     this._ended--
     this.push(null)
   }
 
-  _onrawdrain () {
+  _onrawdrain() {
     const drain = this._drainDone
     if (drain === null) return
     this._drainDone = null
     drain()
   }
 
-  _read (cb) {
+  _read(cb) {
     this.rawStream.resume()
     cb(null)
   }
 
-  _incoming () {
+  _incoming() {
     const message = this._message
 
     this._state = 0
@@ -346,7 +349,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
   }
 
-  _onhandshakert (h) {
+  _onhandshakert(h) {
     if (this._handshakeDone === null) return
 
     if (h !== null) {
@@ -367,7 +370,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     done(null)
   }
 
-  _setupSecretStream (tx, rx, handshakeHash, publicKey, remotePublicKey) {
+  _setupSecretStream(tx, rx, handshakeHash, publicKey, remotePublicKey) {
     const buf = b4a.allocUnsafeSlow(3 + IDHEADERBYTES)
     writeUint24le(IDHEADERBYTES, buf)
 
@@ -393,7 +396,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._rawStream.write(buf)
   }
 
-  _setupSecretSend (handshakeHash) {
+  _setupSecretSend(handshakeHash) {
     this._sendState = b4a.allocUnsafeSlow(32 + 32 + 8 + 8)
     const encrypt = this._sendState.subarray(0, 32) // secrets
     const decrypt = this._sendState.subarray(32, 64)
@@ -401,8 +404,14 @@ module.exports = class NoiseSecretStream extends Duplex {
     const initial = this._sendState.subarray(72)
 
     const inputs = this.isInitiator
-      ? [[NS_INITIATOR, NS_SEND], [NS_RESPONDER, NS_SEND]]
-      : [[NS_RESPONDER, NS_SEND], [NS_INITIATOR, NS_SEND]]
+      ? [
+          [NS_INITIATOR, NS_SEND],
+          [NS_RESPONDER, NS_SEND]
+        ]
+      : [
+          [NS_RESPONDER, NS_SEND],
+          [NS_INITIATOR, NS_SEND]
+        ]
 
     sodium.crypto_generichash_batch(encrypt, inputs[0], handshakeHash)
     sodium.crypto_generichash_batch(decrypt, inputs[1], handshakeHash)
@@ -411,7 +420,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     counter.set(initial)
   }
 
-  _open (cb) {
+  _open(cb) {
     // no autostart or no handshake yet
     if (this._rawStream === null || (this._handshake === null && this._encrypt === null)) {
       this._startDone = cb
@@ -434,7 +443,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (this.isInitiator) this._onhandshakert(this._handshake.send())
   }
 
-  _predestroy () {
+  _predestroy() {
     if (this.rawStream) {
       const error = getStreamError(this)
       this.rawStream.destroy(error)
@@ -459,7 +468,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
   }
 
-  _write (data, cb) {
+  _write(data, cb) {
     let wrapped = this._outgoingWrapped
 
     if (data !== this._outgoingPlain) {
@@ -470,7 +479,11 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
 
     if (wrapped.byteLength - 3 > MAX_ATOMIC_WRITE) {
-      return cb(new Error('Message is too large for an atomic write. Max size is ' + MAX_ATOMIC_WRITE + ' bytes.'))
+      return cb(
+        new Error(
+          'Message is too large for an atomic write. Max size is ' + MAX_ATOMIC_WRITE + ' bytes.'
+        )
+      )
     }
     this.rawBytesWritten += wrapped.byteLength
 
@@ -487,14 +500,14 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
   }
 
-  _final (cb) {
+  _final(cb) {
     this._clearKeepAlive()
     this._ended--
     this._rawStream.end()
     cb(null)
   }
 
-  _resolveOpened (val) {
+  _resolveOpened(val) {
     if (this._openedDone === null) return
     const opened = this._openedDone
     this._openedDone = null
@@ -504,28 +517,28 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.emit('connect')
   }
 
-  _clearTimeout () {
+  _clearTimeout() {
     if (this._timeoutTimer === null) return
     this._timeoutTimer.destroy()
     this._timeoutTimer = null
     this.timeout = 0
   }
 
-  _clearKeepAlive () {
+  _clearKeepAlive() {
     if (this._keepAliveTimer === null) return
     this._keepAliveTimer.destroy()
     this._keepAliveTimer = null
     this.keepAlive = 0
   }
 
-  _destroy (cb) {
+  _destroy(cb) {
     this._clearKeepAlive()
     this._clearTimeout()
     this._resolveOpened(false)
     cb(null)
   }
 
-  _boxMessage (buffer) {
+  _boxMessage(buffer) {
     const MB = sodium.crypto_secretbox_MACBYTES // 16
     const NB = sodium.crypto_secretbox_NONCEBYTES // 24
 
@@ -548,7 +561,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     return envelope
   }
 
-  send (buffer) {
+  send(buffer) {
     if (!this._sendState) return
     if (!this.rawStream?.send) return // udx-stream expected
 
@@ -556,7 +569,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     return this.rawStream.send(message)
   }
 
-  trySend (buffer) {
+  trySend(buffer) {
     if (!this._sendState) return
     if (!this.rawStream?.trySend) return // udx-stream expected
 
@@ -564,7 +577,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.rawStream.trySend(message)
   }
 
-  _onmessage (buffer) {
+  _onmessage(buffer) {
     if (!this._sendState) return // messages before handshake are dropped
 
     const MB = sodium.crypto_secretbox_MACBYTES // 16
@@ -587,14 +600,14 @@ module.exports = class NoiseSecretStream extends Duplex {
     if (success) this.emit('message', plain)
   }
 
-  alloc (len) {
+  alloc(len) {
     const buf = b4a.allocUnsafe(len + 3 + ABYTES)
     this._outgoingWrapped = buf
     this._outgoingPlain = buf.subarray(4, buf.byteLength - ABYTES + 1)
     return this._outgoingPlain
   }
 
-  toJSON () {
+  toJSON() {
     return {
       isInitiator: this.isInitiator,
       publicKey: this.publicKey && b4a.toString(this.publicKey, 'hex'),
@@ -607,26 +620,26 @@ module.exports = class NoiseSecretStream extends Duplex {
   }
 }
 
-function writeUint24le (n, buf) {
-  buf[0] = (n & 255)
+function writeUint24le(n, buf) {
+  buf[0] = n & 255
   buf[1] = (n >>> 8) & 255
   buf[2] = (n >>> 16) & 255
 }
 
-function streamId (handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
+function streamId(handshakeHash, isInitiator, out = b4a.allocUnsafe(32)) {
   sodium.crypto_generichash(out, isInitiator ? NS_INITIATOR : NS_RESPONDER, handshakeHash)
   return out
 }
 
-function toBuffer (data) {
+function toBuffer(data) {
   return typeof data === 'string' ? b4a.from(data) : data
 }
 
-function destroyTimeout () {
+function destroyTimeout() {
   this.destroy(new Error('Stream timed out'))
 }
 
-function sendKeepAlive () {
+function sendKeepAlive() {
   const empty = this.alloc(0)
   this.write(empty)
 }

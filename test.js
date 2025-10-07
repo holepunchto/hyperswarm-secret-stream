@@ -151,7 +151,7 @@ test('send and recv lots of data', function (t) {
   let size = 1024 * 1024 * 1024 // 1gb
 
   const r = new Readable({
-    read (cb) {
+    read(cb) {
       this.push(buf)
       size -= buf.byteLength
       if (size <= 0) this.push(null)
@@ -182,7 +182,7 @@ test('send garbage handshake data', function (t) {
   check(Buffer.alloc(65536))
   check(Buffer.from('\x10\x00\x00garbagegarbagegarbage'))
 
-  function check (buf) {
+  function check(buf) {
     const a = new NoiseStream(true)
 
     a.on('error', function () {
@@ -280,7 +280,9 @@ test('pass in head buffer', async function (t) {
   const expected = [Buffer.from('test1'), Buffer.from('test2'), Buffer.from('test3')]
 
   let done
-  const promise = new Promise((resolve) => { done = resolve })
+  const promise = new Promise((resolve) => {
+    done = resolve
+  })
 
   b.on('data', function (data) {
     t.alike(data, expected.shift())
@@ -288,7 +290,7 @@ test('pass in head buffer', async function (t) {
   })
 
   const buf = []
-  a.rawStream.on('data', function ondata (head) {
+  a.rawStream.on('data', function ondata(head) {
     buf.push(head)
     if (buf.length === 2) {
       a.rawStream.removeListener('data', ondata)
@@ -445,7 +447,7 @@ test('can timeout', function (t) {
 
   const interval = setInterval(tick, 50)
 
-  function tick () {
+  function tick() {
     i++
     if (i < 10) b.write('hi')
   }
@@ -467,7 +469,8 @@ test('keep alive', function (t) {
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
   b.rawStream.on('data', function (data) {
-    if (data.byteLength === 20) { // empty message
+    if (data.byteLength === 20) {
+      // empty message
       clearInterval(interval)
       t.ok(i > 10, 'keep alive when idle')
       a.end()
@@ -477,7 +480,7 @@ test('keep alive', function (t) {
 
   const interval = setInterval(tick, 100)
 
-  function tick () {
+  function tick() {
     i++
     if (i < 10) {
       b.write('hi')
@@ -509,7 +512,8 @@ test('set keep alive multiple times (no mem leak)', function (t) {
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
   b.rawStream.on('data', function (data) {
-    if (data.byteLength === 20) { // empty message
+    if (data.byteLength === 20) {
+      // empty message
       clearInterval(interval)
       t.ok(i > 10, 'keep alive when idle')
       a.end()
@@ -517,7 +521,7 @@ test('set keep alive multiple times (no mem leak)', function (t) {
     }
   })
 
-  function tick () {
+  function tick() {
     i++
     if (i < 10) {
       b.write('hi')
@@ -542,7 +546,8 @@ test('setting keep alive before the stream starts works', function (t) {
 
   a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
   b.rawStream.on('data', function (data) {
-    if (data.byteLength === 20) { // empty message
+    if (data.byteLength === 20) {
+      // empty message
       clearInterval(interval)
       t.ok(i > 10, 'keep alive when idle')
       a.end()
@@ -552,7 +557,7 @@ test('setting keep alive before the stream starts works', function (t) {
 
   const interval = setInterval(tick, 100)
 
-  function tick () {
+  function tick() {
     i++
     if (i < 10) {
       b.write('hi')
@@ -574,7 +579,7 @@ test('message is too large', function (t) {
   a.write(Buffer.alloc(32 * 1024 * 1024))
 })
 
-function createHandshake () {
+function createHandshake() {
   return new Promise((resolve, reject) => {
     const a = new NoiseStream(true)
     const b = new NoiseStream(false)
@@ -586,23 +591,26 @@ function createHandshake () {
 
     a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
 
-    function onhandshake () {
+    function onhandshake() {
       if (--missing === 0) {
         a.destroy()
         b.destroy()
-        resolve([{
-          publicKey: a.publicKey,
-          remotePublicKey: a.remotePublicKey,
-          hash: a.handshakeHash,
-          tx: a._encrypt.key,
-          rx: a._decrypt.key
-        }, {
-          publicKey: b.publicKey,
-          remotePublicKey: b.remotePublicKey,
-          hash: b.handshakeHash,
-          tx: b._encrypt.key,
-          rx: b._decrypt.key
-        }])
+        resolve([
+          {
+            publicKey: a.publicKey,
+            remotePublicKey: a.remotePublicKey,
+            hash: a.handshakeHash,
+            tx: a._encrypt.key,
+            rx: a._decrypt.key
+          },
+          {
+            publicKey: b.publicKey,
+            remotePublicKey: b.remotePublicKey,
+            hash: b.handshakeHash,
+            tx: b._encrypt.key,
+            rx: b._decrypt.key
+          }
+        ])
       }
     }
   })
@@ -641,7 +649,7 @@ test('basic - unslab checks', function (t) {
   })
 })
 
-function udxPair (getOpts = () => ({})) {
+function udxPair(getOpts = () => ({})) {
   const u = new UDX()
   const socket1 = u.createSocket()
   const socket2 = u.createSocket()
@@ -658,7 +666,7 @@ function udxPair (getOpts = () => ({})) {
     destroyPair
   ]
 
-  async function destroyPair () {
+  async function destroyPair() {
     for (const stream of [stream1, stream2]) {
       stream.destroy()
       await streamClosed(stream)
@@ -668,9 +676,9 @@ function udxPair (getOpts = () => ({})) {
     await socket2.close()
   }
 
-  async function streamClosed (stream) {
+  async function streamClosed(stream) {
     if (stream.destroyed) return
-    return new Promise(resolve => stream.once('close', resolve))
+    return new Promise((resolve) => stream.once('close', resolve))
   }
 }
 
@@ -678,7 +686,7 @@ test('encrypted unordered message', async function (t) {
   const [a, b, destroy] = udxPair()
   const message = Buffer.from('plaintext', 'utf8')
 
-  const transmission1 = new Promise(resolve => b.once('message', resolve))
+  const transmission1 = new Promise((resolve) => b.once('message', resolve))
 
   await a.opened
   await b.opened
@@ -688,7 +696,7 @@ test('encrypted unordered message', async function (t) {
   const m0 = await transmission1
   t.ok(m0.equals(message), 'send(): received & decrypted')
 
-  const transmission2 = new Promise(resolve => a.once('message', resolve))
+  const transmission2 = new Promise((resolve) => a.once('message', resolve))
 
   b.trySend(message)
 
@@ -702,7 +710,7 @@ test('too short messages are ignored', async function (t) {
   const [a, b, destroy] = udxPair()
   const message = Buffer.from('plaintext', 'utf8')
 
-  const transmission1 = new Promise(resolve => b.once('message', resolve))
+  const transmission1 = new Promise((resolve) => b.once('message', resolve))
 
   await a.opened
   await b.opened
@@ -721,7 +729,7 @@ test('too short messages are ignored', async function (t) {
   a.rawStream.send(Buffer.from('a'.repeat(sodium.crypto_secretbox_NONCEBYTES + 1)))
 
   // In case errors take a tick to trigger
-  await new Promise(resolve => setImmediate(resolve))
+  await new Promise((resolve) => setImmediate(resolve))
 
   await destroy()
 })
