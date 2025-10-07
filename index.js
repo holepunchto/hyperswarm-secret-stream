@@ -31,6 +31,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.keepAlive = opts.keepAlive || 0
     this.timeout = 0
     this.enableSend = opts.enableSend !== false
+    this.relayAddresses = null // allow this to be populated on the outside
 
     // pointer for upstream to set data here if they want
     this.userData = null
