@@ -1,6 +1,6 @@
 # @hyperswarm/secret-stream
 
-### [See the full API docs at docs.holepunch.to](https://docs.holepunch.to/building-blocks/hyperswarm#secretstream)
+### [See the full API docs at docs.pears.com](https://docs.pears.com/helpers/secretstream)
 
 Secret stream backed by Noise and libsodium's secretstream
 
