@@ -236,8 +236,9 @@ module.exports = class NoiseSecretStream extends Duplex {
             this._tmp = 0
             this._state = 1
             const unprocessed = data.byteLength - offset
-            if (unprocessed < this._len && this._utp !== null)
+            if (unprocessed < this._len && this._utp !== null) {
               this._utp.setContentSize(this._len - unprocessed)
+            }
           }
 
           break
