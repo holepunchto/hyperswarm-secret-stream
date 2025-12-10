@@ -62,7 +62,7 @@ test('works with external streams', function (t) {
     const socket = net.connect(server.address().port)
     const s = new NoiseStream(true, socket)
 
-    s.write(Buffer.from('encrypted!'))
+    s.end(Buffer.from('encrypted!'))
     s.on('close', function () {
       server.close()
     })
@@ -128,7 +128,7 @@ test('async creation', function (t) {
       s.start(socket)
     })
 
-    s.write(Buffer.from('encrypted!'))
+    s.end(Buffer.from('encrypted!'))
     s.on('close', function () {
       server.close()
     })
