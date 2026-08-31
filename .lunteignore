@@ -1,0 +1,4 @@
+# https://github.com/holepunchto/lunte/issues/17
+index.d.ts
+lib/bridge.d.ts
+lib/handshake.d.ts
