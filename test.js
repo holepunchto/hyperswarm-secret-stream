@@ -678,7 +678,7 @@ function udxPair(getOpts = () => ({})) {
 
   async function streamClosed(stream) {
     if (stream.destroyed) return
-    return new Promise((resolve) => stream.once('close', resolve))
+    return await new Promise((resolve) => stream.once('close', resolve))
   }
 }
 
