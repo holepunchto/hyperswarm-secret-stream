@@ -29,7 +29,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.handshakeHash = null
     this.connected = false
     this.keepAlive = opts.keepAlive || 0
-    this._filterZeroByteMessages = this.keepAlive > 0
+    this._filterZeroByteMessages = this.keepAlive > 0 || !!opts.filterZeroByteMessages
     this.timeout = 0
     this.enableSend = opts.enableSend !== false
 

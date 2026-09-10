@@ -589,6 +589,27 @@ test('keep alive - keeps filtering keep alive post end', async (t) => {
   t.pass('done')
 })
 
+test('explicit allow zero byte messages', async (t) => {
+  t.plan(1)
+  const a = new NoiseStream(true, undefined, { filterZeroByteMessages: true })
+  const b = new NoiseStream(false)
+
+  b.setKeepAlive(100)
+
+  a.resume()
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+  a.on('data', function (data) {
+    if (data.byteLength === 0) t.fail('got zero byte message')
+  })
+
+  a.write('hi')
+  a.end()
+
+  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 10))
+  t.pass('done')
+})
+
 test('message is too large', function (t) {
   t.plan(2)
 
