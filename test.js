@@ -594,6 +594,7 @@ test('explicit filter zero byte messages', async (t) => {
   const a = new NoiseStream(true, undefined, { filterZeroByteMessages: true })
   const b = new NoiseStream(false)
 
+  a.setKeepAlive() // Doesnt change filter zero byte flag
   b.setKeepAlive(100)
 
   a.resume()

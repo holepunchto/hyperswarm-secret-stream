@@ -109,7 +109,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._clearKeepAlive()
 
     this.keepAlive = ms
-    this._filterZeroByteMessages = this.keepAlive > 0
+    this._filterZeroByteMessages ||= this.keepAlive > 0
 
     if (!ms || this.rawStream === null) return
 
