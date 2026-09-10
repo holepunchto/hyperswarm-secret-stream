@@ -565,6 +565,30 @@ test('setting keep alive before the stream starts works', function (t) {
   }
 })
 
+test('keep alive - keeps filtering keep alive post end', async (t) => {
+  t.plan(2)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.setKeepAlive(100)
+  b.setKeepAlive(100)
+  t.is(a.keepAlive, 100)
+
+  a.resume()
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+  a.on('data', function (data) {
+    if (data.byteLength === 0) t.fail('got keep alive')
+  })
+
+  a.write('hi')
+  a.end()
+
+  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 10))
+  t.pass('done')
+})
+
 test('message is too large', function (t) {
   t.plan(2)
 

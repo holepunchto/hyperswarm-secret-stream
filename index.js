@@ -29,6 +29,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this.handshakeHash = null
     this.connected = false
     this.keepAlive = opts.keepAlive || 0
+    this._filterZeroByteMessages = this.keepAlive > 0
     this.timeout = 0
     this.enableSend = opts.enableSend !== false
 
@@ -108,6 +109,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     this._clearKeepAlive()
 
     this.keepAlive = ms
+    this._filterZeroByteMessages = this.keepAlive > 0
 
     if (!ms || this.rawStream === null) return
 
@@ -343,7 +345,7 @@ module.exports = class NoiseSecretStream extends Duplex {
     }
 
     // If keep alive is selective, eat the empty buffers (ie assume the other side has it enabled also)
-    if (plain.byteLength === 0 && this.keepAlive !== 0) return
+    if (plain.byteLength === 0 && this._filterZeroByteMessages) return
 
     if (this.push(plain) === false) {
       this.rawStream.pause()
