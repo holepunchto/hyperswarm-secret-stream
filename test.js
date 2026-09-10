@@ -589,7 +589,7 @@ test('keep alive - keeps filtering keep alive post end', async (t) => {
   t.pass('done')
 })
 
-test('explicit allow zero byte messages', async (t) => {
+test('explicit filter zero byte messages', async (t) => {
   t.plan(1)
   const a = new NoiseStream(true, undefined, { filterZeroByteMessages: true })
   const b = new NoiseStream(false)
