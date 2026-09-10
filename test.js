@@ -585,7 +585,7 @@ test('keep alive - keeps filtering keep alive post end', async (t) => {
   a.write('hi')
   a.end()
 
-  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 10))
+  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 100))
   t.pass('done')
 })
 
@@ -607,7 +607,7 @@ test('explicit filter zero byte messages', async (t) => {
   a.write('hi')
   a.end()
 
-  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 10))
+  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 100))
   t.pass('done')
 })
 
