@@ -565,6 +565,52 @@ test('setting keep alive before the stream starts works', function (t) {
   }
 })
 
+test('keep alive - keeps filtering keep alive post end', async (t) => {
+  t.plan(2)
+
+  const a = new NoiseStream(true)
+  const b = new NoiseStream(false)
+
+  a.setKeepAlive(100)
+  b.setKeepAlive(100)
+  t.is(a.keepAlive, 100)
+
+  a.resume()
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+  a.on('data', function (data) {
+    if (data.byteLength === 0) t.fail('got keep alive')
+  })
+
+  a.write('hi')
+  a.end()
+
+  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 100))
+  t.pass('done')
+})
+
+test('explicit filter zero byte messages', async (t) => {
+  t.plan(1)
+  const a = new NoiseStream(true, undefined, { filterZeroByteMessages: true })
+  const b = new NoiseStream(false)
+
+  a.setKeepAlive() // Doesnt change filter zero byte flag
+  b.setKeepAlive(100)
+
+  a.resume()
+
+  a.rawStream.pipe(b.rawStream).pipe(a.rawStream)
+  a.on('data', function (data) {
+    if (data.byteLength === 0) t.fail('got zero byte message')
+  })
+
+  a.write('hi')
+  a.end()
+
+  await new Promise((resolve) => setTimeout(resolve, b.keepAlive + 100))
+  t.pass('done')
+})
+
 test('message is too large', function (t) {
   t.plan(2)
 
